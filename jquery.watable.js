@@ -43,6 +43,7 @@
             pageSizes: [10, 20, 30, 40, 50, 'All'], //available pagesizes
             hidePagerOnEmpty: false, //removes pager if no rows
             preFill: false, //prefill table with empty rows
+            sorting: true, // enable column sorting
             types: { //type specific options
                 string: {},
                 number: {},
@@ -151,12 +152,20 @@
                 for (var i = 0; i < colsSorted.length; i++) {
                     var column = colsSorted[i];
                     var props = _data.cols[column];
+                    var container;
 
                     if (!props.hidden) {
                         var headCell = $('<th></th>').appendTo(_headSort);
-                        var link = $('<a class="pull-left" href="#">{0}</a>'.f(props.friendly || column));
-                        link.on('click', {column: column}, priv.columnClicked).appendTo(headCell);
+                        if(priv.options.sorting && props.sorting !== false) {
+                            var container = $('<a class="pull-left" href="#">{0}</a>'.f(props.friendly || column));
+                            container.on('click', {column: column}, priv.columnClicked);
+                        }
+                        else {
+                            container = $('<span class="pull-left">{0}</a>'.f(props.friendly || column));
+                        }
 
+                        container.appendTo(headCell);
+                        
                         if (props.tooltip) {
                             $('<i class="icon-info-sign"></i>').tooltip({
                                 title: props.tooltip.trim(),
@@ -167,7 +176,7 @@
                                     show: 500,
                                     hide: 100
                                 }
-                            }).appendTo(link);
+                            }).appendTo(container);
                         }
 
                         //Add sort arrow
@@ -597,7 +606,7 @@
             _uniqueCol = "";
             $.each(_data.cols, function (col, props) {
                 //set sorting
-                if (!_currSortCol && props.sortOrder) {
+                if (!_currSortCol && props.sortOrder && priv.options.sorting && props.sorting !== false) {
                     _currSortCol = col;
                     _currSortFlip = props.sortOrder != "asc";
                 }
