@@ -995,7 +995,8 @@
             //toggle column visibility
             _data.cols[col].hidden = !_data.cols[col].hidden;
 
-            _data.cols[col].index = new priv.ext.XDate();
+            if( !_data.cols[col].index)
+                _data.cols[col].index = new priv.ext.XDate();
             _head = undefined;
             _body = undefined;
             priv.createTable();
