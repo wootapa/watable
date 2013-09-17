@@ -43,6 +43,7 @@
             pageSizes: [10, 20, 30, 40, 50, 'All'], //available pagesizes
             hidePagerOnEmpty: false, //removes pager if no rows
             preFill: false, //prefill table with empty rows
+            sortEmptyRowToTheEnd: false, //send rows with empty value to the end of list.
             types: { //type specific options
                 string: {},
                 number: {},
@@ -812,8 +813,13 @@
                     if (String(valA).toLowerCase() > String(valB).toLowerCase()) return _currSortFlip ? -1 : 1;
                     else return _currSortFlip ? 1 : -1;
                 } else {
-                    if (valA == undefined) valA = Number.NEGATIVE_INFINITY;
-                    if (valB == undefined) valB = Number.NEGATIVE_INFINITY;
+                    if (priv.options.sortEmptyRowToTheEnd) {
+                      if (valA == undefined) valA = _currSortFlip ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY;
+                      if (valB == undefined) valB = _currSortFlip ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY;
+                    } else {
+                      if (valA == undefined) valA = Number.NEGATIVE_INFINITY;
+                      if (valB == undefined) valB = Number.NEGATIVE_INFINITY;
+                    }
 
                     if (valA == valB) return 0;
                     if (valA > valB) return _currSortFlip ? -1 : 1;
