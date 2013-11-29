@@ -355,7 +355,7 @@
                                     cell.html(format.f(val));
                                     break;
                                 case "number":
-                                    val = Number(val);
+                                    val = (+val);
                                     var forceDecimals = !isNaN(_data.cols[key].decimals);
                                     if (forceDecimals) cell.html(format.f(val.toFixed(_data.cols[key].decimals)));
                                     else {
