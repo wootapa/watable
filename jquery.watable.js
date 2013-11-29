@@ -814,6 +814,9 @@
                 } else {
                     if (valA == undefined) valA = Number.NEGATIVE_INFINITY;
                     if (valB == undefined) valB = Number.NEGATIVE_INFINITY;
+                    // cast values to number
+                    valA = (+valA);
+                    valB = (+valB);
 
                     if (valA == valB) return 0;
                     if (valA > valB) return _currSortFlip ? -1 : 1;
