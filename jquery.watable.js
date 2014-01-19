@@ -526,7 +526,7 @@
                         prevBody.remove();
                         _body.show(0);
                         _transition.supported = false;
-                    }, (priv.options.transitionDuration * 1000) /* wait a little longer */ + 100);
+                    }, (priv.options.transitionDuration * 1000) /* wait a little longer */ + 500);
 
                     //animate out the previous body
                     prevBody.addClass('animated {0}'.f(transition.tout));
