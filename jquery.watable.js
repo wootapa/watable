@@ -355,7 +355,7 @@
                                     cell.html(format.f(val));
                                     break;
                                 case "number":
-                                    val = Number(val);
+                                    val = (+val);
                                     var forceDecimals = !isNaN(_data.cols[key].decimals);
                                     if (forceDecimals) cell.html(format.f(val.toFixed(_data.cols[key].decimals)));
                                     else {
@@ -814,6 +814,9 @@
                 } else {
                     if (valA == undefined) valA = Number.NEGATIVE_INFINITY;
                     if (valB == undefined) valB = Number.NEGATIVE_INFINITY;
+                    // cast values to number
+                    valA = (+valA);
+                    valB = (+valB);
 
                     if (valA == valB) return 0;
                     if (valA > valB) return _currSortFlip ? -1 : 1;
