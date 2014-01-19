@@ -284,7 +284,7 @@
                     $.map(_filterCols, function (colProps, col) {
                         if (col == "unique") {
                             if (colProps.filter) elem.prop('checked', true).removeClass('indeterminate');
-                                else if (!colProps.filter) elem.prop('checked', false).removeClass('indeterminate');
+                            else if (!colProps.filter) elem.prop('checked', false).removeClass('indeterminate');
                             else if (colProps.filter == '') elem.addClass('indeterminate');
                         }
                     });
