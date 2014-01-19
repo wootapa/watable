@@ -173,7 +173,7 @@
                         dummy: {
                             index: 1,
                             friendly: "&nbsp;",
-                            type: "none"
+                            type: "string"
                         }
                     },
                     rows: []
