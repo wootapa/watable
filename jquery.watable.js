@@ -1,5 +1,5 @@
 /*
- WATable 1.07
+ WATable 1.08
  Copyright (c) 2012 Andreas Petersson(apesv03@gmail.com)
  http://wootapa-watable.appspot.com/
 
@@ -38,18 +38,22 @@
             filter: false, //show filter row
             columnPicker: false, //show columnpicker
             checkboxes: false, //show body checkboxes
+            checkAllToggle: true, //show check all toggle
             actions: '', //holds action links
             pageSize: 10, //current pagesize
             pageSizes: [10, 20, 30, 40, 50, 'All'], //available pagesizes
             hidePagerOnEmpty: false, //removes pager if no rows
             preFill: false, //prefill table with empty rows
             sorting: true, // enable column sorting
+            sortEmptyLast: true, //empty values will be shown last
             types: { //type specific options
                 string: {},
                 number: {},
                 bool: {},
                 date: {}
-            }
+            },
+            transition: undefined, //transition type when paging
+            transitionDuration: 0.3 //duration of transition in seconds
         };
 
         /* bundled scripts */
@@ -78,6 +82,76 @@
         var _uniqueCols = {}; //array with checked rows
         var _checkToggleChecked = false; //check-all toggle state
 
+        var _vendors = ["webkit", "moz", "Moz", "ms", "o", "O"]; //vendors prefixes. used for not yet officially supported features.
+        var _transition = {
+            supported: undefined, //true if browser supports transitions
+            doTransition: false,  //true if allowed to transition
+            direction: undefined, //direction of transition.
+            available: {
+                'bounce': {
+                    next: {
+                        tin: 'bounceIn',
+                        tout: 'bounceOut'
+                    },
+                    prev: {
+                        tin: 'bounceIn',
+                        tout: 'bounceOut'
+                    }
+                },
+                'fade': {
+                    next: {
+                        tin: 'fadeIn',
+                        tout: 'fadeOut'
+                    },
+                    prev: {
+                        tin: 'fadeIn',
+                        tout: 'fadeOut'
+                    }
+                },
+                'flip': {
+                    next: {
+                        tin: 'flipInX',
+                        tout: 'flipOutX'
+                    },
+                    prev: {
+                        tin: 'flipInX',
+                        tout: 'flipOutX'
+                    }
+                },
+                'rotate': {
+                    next: {
+                        tin: 'rotateInDownLeft',
+                        tout: 'rotateOutDownLeft'
+                    },
+                    prev: {
+                        tin: 'rotateInUpLeft',
+                        tout: 'rotateOutUpLeft'
+                    }
+                },
+                'scroll': {
+                    next: {
+                        tin: 'fadeInUp',
+                        tout: 'fadeOutUp'
+                    },
+                    prev: {
+                        tin: 'fadeInDown',
+                        tout: 'fadeOutDown'
+                    }
+                },
+                'slide': {
+                    next: {
+                        tin: 'fadeInRight',
+                        tout: 'fadeOutLeft'
+                    },
+                    prev: {
+                        tin: 'fadeInLeft',
+                        tout: 'fadeOutRight'
+                    }
+                }
+            }
+
+        }
+
         /*
          initialize the plugin.
          */
@@ -87,6 +161,10 @@
             priv.options.types.number = ((priv.options.types || {}).number || {});
             priv.options.types.bool = ((priv.options.types || {}).bool || {});
             priv.options.types.date = ((priv.options.types || {}).date || {});
+            priv.options.transition = priv.options.transition === true ? 'scroll' : priv.options.transition;
+
+            //check support transitions
+            _transition.supported = priv.supportsTransition();
 
             //fill the table with empty cells
             if (priv.options.preFill) {
@@ -95,7 +173,7 @@
                         dummy: {
                             index: 1,
                             friendly: "&nbsp;",
-                            type: "string"
+                            type: "none"
                         }
                     },
                     rows: []
@@ -144,39 +222,40 @@
                 if (_uniqueCol && priv.options.checkboxes) {
                     var checked = _checkToggleChecked ? 'checked' : '';
                     var headCell = $('<th></th>').appendTo(_headSort);
-                    var elem = $('<input {0} class="checkToggle" type="checkbox" />'.f(checked)).appendTo(headCell);
-                    elem.on('change', priv.checkToggleChanged);
+                    if (priv.options.checkAllToggle) {
+                        var elem = $('<input {0} class="checkToggle" type="checkbox" />'.f(checked)).appendTo(headCell);
+                        elem.on('change', priv.checkToggleChanged);
+                    }
                 }
 
                 //create the sortable headers
                 for (var i = 0; i < colsSorted.length; i++) {
                     var column = colsSorted[i];
                     var props = _data.cols[column];
-                    var container;
 
                     if (!props.hidden) {
                         var headCell = $('<th></th>').appendTo(_headSort);
+                        var link;
                         if(priv.options.sorting && props.sorting !== false) {
-                            var container = $('<a class="pull-left" href="#">{0}</a>'.f(props.friendly || column));
-                            container.on('click', {column: column}, priv.columnClicked);
+                            link = $('<a class="pull-left" href="#">{0}</a>'.f(props.friendly || column));
+                            link.on('click', {column: column}, priv.columnClicked);
                         }
                         else {
-                            container = $('<span class="pull-left">{0}</a>'.f(props.friendly || column));
+                            link = $('<span class="pull-left">{0}</span>'.f(props.friendly || column));
                         }
+                        link.appendTo(headCell);
 
-                        container.appendTo(headCell);
-                        
                         if (props.tooltip) {
                             $('<i class="icon-info-sign"></i>').tooltip({
                                 title: props.tooltip.trim(),
                                 html: true,
                                 container: 'body',
-                                placement: "top",
+                                placement: 'top',
                                 delay: {
                                     show: 500,
                                     hide: 100
                                 }
-                            }).appendTo(container);
+                            }).appendTo(link);
                         }
 
                         //Add sort arrow
@@ -205,7 +284,7 @@
                     $.map(_filterCols, function (colProps, col) {
                         if (col == "unique") {
                             if (colProps.filter) elem.prop('checked', true).removeClass('indeterminate');
-                            else if (!colProps.filter) elem.prop('checked', false).removeClass('indeterminate');
+                                else if (!colProps.filter) elem.prop('checked', false).removeClass('indeterminate');
                             else if (colProps.filter == '') elem.addClass('indeterminate');
                         }
                     });
@@ -241,7 +320,7 @@
                                 if (placeHolder == undefined) placeHolder = priv.options.types.number.placeHolder;
                                 placeHolder = (placeHolder === true || placeHolder == undefined) ? '10..20 =50' : placeHolder === false ? '' : placeHolder;
                                 if (tooltip == undefined) tooltip = priv.options.types.number.filterTooltip;
-                                tooltip = (tooltip === true || tooltip == undefined) ? 'Values 10 to 20:<br/>10..20<br/>Values exactly 50:<br/>=50' : tooltip === false ? '' : tooltip;
+                                tooltip = (tooltip === true || tooltip == undefined) ? 'Values 10 to 20:<br/>10..20<br/>Values except 10 to 20:<br/>!10..20<br/>Values exactly 50:<br/>=50' : tooltip === false ? '' : tooltip;
                                 elem = $('<input placeholder="{0}" class="filter" type="text" />'.f(placeHolder));
                                 elem.on('keyup', {column: column}, priv.filterChanged);
                                 break;
@@ -249,7 +328,7 @@
                                 if (placeHolder == undefined) placeHolder = priv.options.types.date.placeHolder;
                                 placeHolder = (placeHolder === true || placeHolder == undefined) ? '-7..0' : placeHolder === false ? '' : placeHolder;
                                 if (tooltip == undefined) tooltip = priv.options.types.date.filterTooltip;
-                                tooltip = (tooltip === true || tooltip == undefined) ? 'Today:<br/>0..1<br/>A week today excluded:<br/>-7..0' : tooltip === false ? '' : tooltip;
+                                tooltip = (tooltip === true || tooltip == undefined) ? 'Today:<br/>0..1<br/>All except today:<br/>!0..1<br/>A week today excluded:<br/>-7..0' : tooltip === false ? '' : tooltip;
                                 elem = $('<div><input placeholder="{0}" class="filter" type="text" /></div>'.f(placeHolder));
 
                                 if (priv.options.types.date.datePicker === true || priv.options.types.date.datePicker == undefined)
@@ -266,7 +345,7 @@
                                         dp.on('changeDate', {column: column, input: $('input.filter', elem)}, priv.dpClicked);
                                     }
                                     else
-                                    if (priv.options.debug) console.log('datepicker plugin not found');
+                                    priv.log('datepicker plugin not found');
                                 }
                                 elem.on('keyup', 'input.filter', {column: column}, priv.filterChanged);
                                 break;
@@ -280,7 +359,7 @@
                                 if (placeHolder == undefined) placeHolder = priv.options.types.string.placeHolder;
                                 placeHolder = (placeHolder === true || placeHolder == undefined) ? 'John Doe' : placeHolder === false ? '' : placeHolder;
                                 if (tooltip == undefined) tooltip = priv.options.types.string.filterTooltip;
-                                tooltip = (tooltip === true || tooltip == undefined) ? 'Find John Doe:<br/>John Doe<br/>Find all but John Doe:<br/>!John Doe' : tooltip === false ? '' : tooltip;
+                                tooltip = (tooltip === true || tooltip == undefined) ? 'Find John Doe:<br/>John Doe<br/>Find John and Jane Doe(Regex):<br/>?John Doe|Jane Doe<br/>Find all except John Doe:<br/>!John Doe' : tooltip === false ? '' : tooltip;
                                 elem = $('<input placeholder="{0}" class="filter" type="text" />'.f(placeHolder));
                                 elem.on('keyup', {column: column}, priv.filterChanged);
                                 break;
@@ -322,8 +401,10 @@
 
             //create the body
             if (!_body) {
-                _table.find('tbody').remove();
-                _body = $('<tbody></tbody>').insertAfter(_head);
+                var prevBody = _table.find('tbody');
+                if (!_transition.doTransition && prevBody.length)
+                    prevBody.remove();
+                _body = $('<tbody style="display:none"></tbody>').insertAfter(_head);
                 _body.on('change', '.unique', priv.rowChecked);
                 _body.on('click', 'td', priv.rowClicked);
 
@@ -413,6 +494,43 @@
                         rowsAdded++;
                     }
                 }
+
+                //transition between bodys?
+                if (prevBody.length && _transition.doTransition) {
+                    var transition = _transition.direction == 1 ? _transition.available[priv.options.transition].next : _transition.available[priv.options.transition].prev;
+
+                    //animation duration
+                    var vendorCSSProps = {};
+                    $.each(_vendors, function (index, vendor) {
+                        var key = '-{0}-animation-duration'.f(vendor);
+                        vendorCSSProps[key] = '{0}s'.f(priv.options.transitionDuration);
+                    });
+                    prevBody.css(vendorCSSProps);
+
+                    var fallbackTimer;
+                    var vendorAnimationEnd = $.map(_vendors, function (vendor) { return '{0}AnimationEnd {0}animationend'.f(vendor); }).join(" ");
+                    prevBody.on('{0} animationend'.f(vendorAnimationEnd), function (e) {
+                        clearTimeout(fallbackTimer);
+                        prevBody.remove();
+                        _body.css(vendorCSSProps);
+                        //animate in the current body
+                        _body.show(0).addClass('animated {0}'.f(transition.tin));
+                    });
+
+                    //fallback timer to prevent paging from breaking when animationend wont fire
+                    fallbackTimer = setTimeout(function(e) {
+                        priv.log('animate.css seems to be missing!', true);
+                        prevBody.remove();
+                        _body.show(0);
+                        _transition.supported = false;
+                    }, (priv.options.transitionDuration * 1000) /* wait a little longer */ + 100);
+
+                    //animate out the previous body
+                    prevBody.addClass('animated {0}'.f(transition.tout));
+                    _transition.doTransition = false;
+                }
+                else
+                    _body.show(0);
             }
 
             //create the footer
@@ -452,13 +570,14 @@
 
                 for (var i = lowerPage; i <= upperPage; i++) {
                     var link;
-                    if (i != _currPage) link = $('<li class="{1}"><a href="#">{0}</a></li>'.f(i, i > _totalPages ? 'disabled' : ''));
-                    if (i == _currPage) link = $('<li class="active"><a href="#">{0}</a></li>'.f(i));
-
-                    if (link) {
-                        link.on('click', {pageIndex: i}, priv.pageChanged);
-                        link.appendTo(footPagerUl);
+                    if (i == _currPage) {
+                        link = $('<li class="active"><a href="#">{0}</a></li>'.f(i));
                     }
+                    else {
+                        link = $('<li class="{1}"><a href="#">{0}</a></li>'.f(i, i > _totalPages ? 'disabled' : ''));
+                        link.on('click', {pageIndex: i}, priv.pageChanged);
+                    }
+                    link.appendTo(footPagerUl);
                 }
                 $('<li class="{0}"><a href="#">»</a></li>'.f(_currPage == _totalPages ? 'disabled' : ''))
                     .on('click', {pageIndex: _currPage + 1}, priv.pageChanged).appendTo(footPagerUl);
@@ -529,8 +648,7 @@
 
             if (_data.rows.length == 0 && priv.options.hidePagerOnEmpty)
                 $('.btn-toolbar', _foot).remove();
-            if (priv.options.debug)
-                console.log('table created in {0} ms.'.f(new priv.ext.XDate() - start));
+            priv.log('table created in {0} ms.'.f(new priv.ext.XDate() - start));
             if (typeof priv.options.tableCreated == 'function')
                 priv.options.tableCreated.call(_table.get(0), {table: _table.get(0)});
 
@@ -541,11 +659,11 @@
          */
         priv.update = function (callback, skipCols, resetChecked) {
             if (!priv.options.url) {
-                if (priv.options.debug) console.log('no url found');
+                priv.log('no url found');
                 return;
             }
 
-            if (priv.options.debug) console.log('requesting data from url:{0} data:{1}'.f(priv.options.url, JSON.stringify(priv.options.urlData) || ''));
+            priv.log('requesting data from url:{0} data:{1}'.f(priv.options.url, JSON.stringify(priv.options.urlData) || ''));
             var start = new priv.ext.XDate();
 
             $.ajax({
@@ -556,7 +674,7 @@
                 data: priv.options.urlData,
                 async: true,
                 success: function (data) {
-                    if (priv.options.debug) console.log('request finished in {0} ms.'.f(new priv.ext.XDate() - start));
+                    priv.log('request finished in {0} ms.'.f(new priv.ext.XDate() - start));
 
                     //assign the new data
                     if (data.d && data.d.cols)
@@ -567,7 +685,7 @@
                         callback.call(this);
                 },
                 error: function (err) {
-                    console.log('request error: '.f(err));
+                    priv.log('request error: '.f(err));
                 }
             });
         };
@@ -681,95 +799,124 @@
 
             //for every column with a filter, run through the rows and return the matching rows
             $.each(_filterCols, function (col, colProps) {
-                if (priv.options.debug) console.log('filtering on text:{0} col:{1} type:{2} '.f(colProps.filter, colProps.col.column, colProps.col.type));
+                priv.log('filtering on text:{0} col:{1} type:{2} '.f(colProps.filter, colProps.col.column, colProps.col.type));
 
                 switch (colProps.col.type) {
                     case "string":
-                        _data.rows = $.map(_data.rows, function (row) {
-                            var val = String(row[col]);
-                            var filter = colProps.filter.toLowerCase();
+                        var filter = colProps.filter;
+                        var ne = false, regex = false, validRegex = true;
+
+                        //Escaping first character means cannot be negate or regex
+                        if (filter.charAt(0) == '\\')
+                            filter = filter.substr(1);
+                        else {
                             var ne = filter.charAt(0) == '!';
                             if (ne) filter = filter.substring(1);
-                            var pos = val.toLowerCase().indexOf(filter);
+                            regex = filter.length > 0 && filter.charAt(0) == "?";
+                        }
 
-                            if ((pos == -1 && ne) || colProps.filter === '') return row;
-                            else if (row[col] != undefined && pos >= 0 && !ne) {
-                                if (!row[col + 'Format'] && !colProps.col.format) {
-                                    var pre = val.substring(0, pos);
-                                    var match = val.substring(pos, pos + colProps.filter.length);
-                                    var post = val.substring(pos + colProps.filter.length, row[col].length);
-                                    row[col + 'Format'] = '<span>{0}<span class="filter">{1}</span>{2}</span>'.f(pre, match, post);
+                        if (regex) {
+                            filter = filter.substr(1);
+                            try {filter = new RegExp(filter, "gi");}
+                            catch(err) {
+                                priv.log('invalid regex:{0}'.f(filter), true);
+                                validRegex = false;
+                            }
+                        }
+                        else filter = filter.toLowerCase();
+
+                        _data.rows = $.map(_data.rows, function (row) {
+                            var val = String(row[col]);
+
+                            if (regex && validRegex) {
+                                var matches = val.match(filter);
+                                if (!matches && ne) return row;
+
+                                if (matches && !ne) {
+                                    var pos = 0;
+                                    $.each(matches, function(index, match) {
+                                        var matchMask = '<span class="filter">{0}</span>'.f(match);
+                                        pos = val.indexOf(match, pos);
+                                        var pre = val.substring(0, pos);
+                                        var post = val.substring(pos + match.length);
+                                        val = '{0}{1}{2}'.f(pre, matchMask, post);
+                                        pos += matchMask.length;
+                                    });
+
+                                    if (!row[col + 'Format'] && !colProps.col.format) {
+                                        row[col + 'Format'] = val;
+                                    }
+                                    return row;
                                 }
-                                return row;
+                            }
+                            else {
+                                var pos = val.toLowerCase().indexOf(filter);
+
+                                if ((pos == -1 && ne) || filter === '') return row;
+                                else if (row[col] != undefined && pos >= 0 && !ne) {
+                                    if (!row[col + 'Format'] && !colProps.col.format) {
+                                        var pre = val.substring(0, pos);
+                                        var match = val.substring(pos, pos + filter.length);
+                                        var post = val.substring(pos + filter.length, row[col].length);
+                                        row[col + 'Format'] = '{0}<span class="filter">{1}</span>{2}'.f(pre, match, post);
+                                    }
+                                    return row;
+                                }
                             }
                         });
                         break;
                     case "number":
                     case "date":
+                        var expr = colProps.filter.replace(/\s+/gi, ' ');
+                        var pos = -1, lval, rval, op;
+                        var ne = expr.charAt(0) == '!';
+                        if (ne) expr = expr.substring(1);
+
+                        //find operator,l/r value
+                        $.each(["..", "="], function(index, operator) {
+                            pos = expr.indexOf(operator);
+                            if (pos >= 0) {
+                                op = operator;
+                                lval = expr.substring(0, pos);
+                                rval = expr.substring(pos + op.length);
+
+                                lval = parseFloat(lval);
+                                rval = parseFloat(rval);
+                                if (isNaN(lval)) lval = Number.NEGATIVE_INFINITY;
+                                if (isNaN(rval)) rval = Number.MAX_VALUE;
+
+                                if (colProps.col.type == "date") {
+                                    var today = new priv.ext.XDate(priv.options.types.date.utc === true).setHours(0, 0, 0, 0);
+                                    lval = today - (lval * -1) * (60 * 60 * 24 * 1000);
+                                    rval = today - (rval * -1) * (60 * 60 * 24 * 1000);
+                                }
+                                return false;
+                            }
+                        });
+
                         _data.rows = $.map(_data.rows, function (row) {
-                            var exp = colProps.filter.replace(/\s+/gi, ' ').split(' ');
-                            exp = $(exp).filter(function(){return this});
-                            var opArray = [">=", "<=", "..", ">", "<", "="];
-                            var matches = 0;
-                            var illegal = true;
+                            var match = false;
 
-                            $.each(exp, function (index, expr) {
-
-                                for (var i = 0; i < opArray.length; i++) {
-
-                                    var op = opArray[i];
-                                    var pos = expr.indexOf(op);
-                                    var lval = expr.substring(0, pos);
-                                    var rval = expr.substring(pos + op.length);
-
-                                    if (pos == -1) continue;
-
-                                    illegal = ((lval.length + rval.length) == 0);
-                                    lval = parseFloat(lval);
-                                    rval = parseFloat(rval);
-                                    if (isNaN(lval)) lval = Number.NEGATIVE_INFINITY;
-                                    if (isNaN(rval)) rval = Number.MAX_VALUE;
-
+                            switch (op) {
+                                case "=":
+                                    if (row[col] == rval) match = true;
+                                    break;
+                                case "..":
                                     if (colProps.col.type == "date") {
-                                        var today = new priv.ext.XDate(priv.options.types.date.utc === true).setHours(0, 0, 0, 0);
-                                        lval = today - (lval * -1) * (60 * 60 * 24 * 1000);
-                                        rval = today - (rval * -1) * (60 * 60 * 24 * 1000);
+                                        if (row[col] >= lval && row[col] < rval) match = true;
                                     }
-
-                                    switch (op) {
-                                        case ">":
-                                            if (row[col] > rval) matches++;
-                                            break;
-                                        case ">=":
-                                            if (row[col] >= rval) matches++;
-                                            break;
-                                        case "<":
-                                            if (row[col] < rval) matches++;
-                                            break;
-                                        case "<=":
-                                            if (row[col] <= rval) matches++;
-                                            break;
-                                        case "=":
-                                            if (row[col] == rval) matches++;
-                                            break;
-                                        case "..":
-                                            if (colProps.col.type == "date") {
-                                                if (row[col] >= lval && row[col] < rval) matches++;
-                                            }
-                                            else {
-                                                if (row[col] >= lval && row[col] <= rval) matches++;
-                                            }
-                                            break;
-                                        default:
-                                            illegal = true;
+                                    else {
+                                        if (row[col] >= lval && row[col] <= rval) match = true;
                                     }
                                     break;
-                                }
-                            });
-                            if ((exp.length == 1 && illegal) ||
-                                (matches > 0 && illegal) ||
-                                matches == exp.length ||
-                                colProps.filter == '') return row;
+                                default:
+                                    break;
+                            }
+                            if (match && !ne ||
+                                !match && ne ||
+                                expr.length == 0 ||
+                                pos < 0)
+                                return row;
                         });
                         break;
                     case "bool":
@@ -789,7 +936,7 @@
                 }
                 if (colProps.filter === '') delete _filterCols[colProps.col.column];
             });
-            if (priv.options.debug) console.log('filtering finished in {0} ms.'.f(new priv.ext.XDate() - start));
+            priv.log('filtering finished in {0} ms.'.f(new priv.ext.XDate() - start));
 
             _currPage = 1;
             _data.fromRow = 0;
@@ -805,7 +952,7 @@
             if (!_currSortCol) return;
 
             var start = new priv.ext.XDate();
-            if (priv.options.debug) console.log('sorting on col:{0} order:{1}'.f(_currSortCol, _currSortFlip ? "desc" : "asc"));
+            priv.log('sorting on col:{0} order:{1}'.f(_currSortCol, _currSortFlip ? "desc" : "asc"));
 
             var isString = (_data.cols[_currSortCol].type == "string");
             _data.rows = _data.rows.sort(function (a, b) {
@@ -821,18 +968,20 @@
                     if (String(valA).toLowerCase() > String(valB).toLowerCase()) return _currSortFlip ? -1 : 1;
                     else return _currSortFlip ? 1 : -1;
                 } else {
-                    if (valA == undefined) valA = Number.NEGATIVE_INFINITY;
-                    if (valB == undefined) valB = Number.NEGATIVE_INFINITY;
-                    // cast values to number
                     valA = (+valA);
                     valB = (+valB);
-
+                    if (valA == undefined || isNaN(valA)) {
+                        valA = priv.options.sortEmptyLast ? _currSortFlip ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+                    }
+                    if (valB == undefined || isNaN(valB)) {
+                        valB = priv.options.sortEmptyLast ? _currSortFlip ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY : Number.NEGATIVE_INFINITY;
+                    }
                     if (valA == valB) return 0;
                     if (valA > valB) return _currSortFlip ? -1 : 1;
                     else return _currSortFlip ? 1 : -1;
                 }
             });
-            if (priv.options.debug) console.log('sorting finished in {0} ms.'.f(new priv.ext.XDate() - start));
+            priv.log('sorting finished in {0} ms.'.f(new priv.ext.XDate() - start));
         };
 
         /*
@@ -847,8 +996,38 @@
                     return false;
                 }
             });
-            if (priv.options.debug) console.log('row lookup finished in {0} ms.'.f(new priv.ext.XDate() - start));
+            priv.log('row lookup finished in {0} ms.'.f(new priv.ext.XDate() - start));
             return row;
+        };
+
+        /*
+         helper for console logging
+         */
+        priv.log = function (message, isWarning) {
+            if (isWarning)
+                console.warn(message);
+            else if (priv.options.debug)
+                console.log(message);
+        };
+
+        /*
+        helper to detect transition support
+         */
+        priv.supportsTransition = function() {
+            var style = document.createElement('p').style;
+            //check vendorfree support
+            if( style['transition'] == '' )
+                return true;
+
+            //check vendor support
+            var vendorSupport = false;
+             $.each(_vendors, function (index, vendor) {
+                 if ('{0}Transition'.f(vendor) in style) {
+                     vendorSupport = true;
+                     return false;
+                 }
+             });
+            return vendorSupport;
         };
 
 
@@ -863,7 +1042,7 @@
             //clear old timer if we're typing fast enough
             if (_filterTimeout) {
                 clearTimeout(_filterTimeout);
-                if (priv.options.debug) console.log('filtering cancelled');
+                priv.log('filtering cancelled');
             }
 
             var filter = this.value;
@@ -912,9 +1091,12 @@
             e.preventDefault();
             if (e.data.pageIndex < 1 || e.data.pageIndex > _totalPages) return;
 
+            //if we have a valid transition, enable it.
+            _transition.doTransition = (_transition.supported && priv.options.transitionDuration > 0 && _transition.available[priv.options.transition]) || false; //
+            _transition.direction = e.data.pageIndex < _currPage ? 0 : 1;
             //set the new page
             _currPage = e.data.pageIndex;
-            if (priv.options.debug) console.log('paging to index:{0}'.f(_currPage));
+            priv.log('paging to index:{0}'.f(_currPage));
 
             //find out what rows to create
             _data.fromRow = ((_currPage - 1) * _pageSize);
@@ -941,7 +1123,7 @@
         priv.pageSizeChanged = function (e) {
             e.preventDefault();
             var val = $(this).text().toLowerCase();
-            if (priv.options.debug) console.log('pagesize changed to:{0}'.f(val));
+            priv.log('pagesize changed to:{0}'.f(val));
 
             //set the new pagesize
             if (val == "all") priv.options.pageSize = _data.rows.length;
@@ -972,7 +1154,7 @@
          */
         priv.columnClicked = function (e) {
             e.preventDefault();
-            if (priv.options.debug) console.log('col:{0} clicked'.f(e.data.column));
+            priv.log('col:{0} clicked'.f(e.data.column));
 
             //set the new sorting column
             if (_currSortCol == e.data.column) _currSortFlip = !_currSortFlip;
@@ -1002,12 +1184,12 @@
 
             var elem = $(this);
             var col = elem.val();
-            if (priv.options.debug) console.log('col:{0} {1}'.f(col, elem.is(':checked') ? 'checked' : 'unchecked'));
+            priv.log('col:{0} {1}'.f(col, elem.is(':checked') ? 'checked' : 'unchecked'));
 
             //toggle column visibility
             _data.cols[col].hidden = !_data.cols[col].hidden;
 
-            _data.cols[col].index = new priv.ext.XDate();
+            _data.cols[col].index = _data.cols[col].index || new priv.ext.XDate();
             _head = undefined;
             _body = undefined;
             priv.createTable();
@@ -1028,7 +1210,7 @@
                     if (row.checkable === false) return;
                     _uniqueCols[props[_uniqueCol]] = row;
                 });
-                if (priv.options.debug) console.log('{0} rows checked in {1} ms.'.f(_data.rows.length, new priv.ext.XDate() - start));
+                priv.log('{0} rows checked in {1} ms.'.f(_data.rows.length, new priv.ext.XDate() - start));
                 _checkToggleChecked = true;
             }
             else {
@@ -1041,7 +1223,7 @@
                     else
                         delete _uniqueCols[key];
                 }
-                if (priv.options.debug) console.log('{0} rows unchecked in {1} ms.'.f(_data.rows.length, new priv.ext.XDate() - start));
+                priv.log('{0} rows unchecked in {1} ms.'.f(_data.rows.length, new priv.ext.XDate() - start));
                 _checkToggleChecked = false;
             }
             _body = undefined;
@@ -1057,7 +1239,7 @@
 
             //get the row's unique value
             var unique = elem.closest('tr').data('unique');
-            if (priv.options.debug) console.log('row({0}) {1}'.f(unique, elem.is(':checked') ? 'checked' : 'unchecked'));
+            priv.log('row({0}) {1}'.f(unique, elem.is(':checked') ? 'checked' : 'unchecked'));
 
             //store the row in checked array
             if (elem.is(':checked')) _uniqueCols[unique] = priv.getRow(unique);
@@ -1070,7 +1252,7 @@
          */
         priv.rowClicked = function (e) {
             if (!_uniqueCol) {
-                if (priv.options.debug) console.log('no unique column specified');
+                priv.log('no unique column specified');
                 return;
             }
 
@@ -1098,7 +1280,7 @@
          what: sets the datepicker operator before a datepicker date is chosen.
          */
         priv.dpOpChanged = function(e) {
-            if (priv.options.debug) console.log('dp oper:{0} clicked'.f(e.data.op));
+            priv.log('dp oper:{0} clicked'.f(e.data.op));
             e.preventDefault();
             _currDpOp = e.data.op;
         };
@@ -1108,7 +1290,7 @@
          what: triggers filtering on the date
          */
         priv.dpClicked = function (e) {
-            if (priv.options.debug) console.log('dp date:{0} clicked'.f(new priv.ext.XDate(e.date, priv.options.types.date.utc === true).toString('yyyy-MM-dd')));
+            priv.log('dp date:{0} clicked'.f(new priv.ext.XDate(e.date, priv.options.types.date.utc === true).toString('yyyy-MM-dd')));
 
             e.preventDefault();
             input = $(this).prev('input.filter').get(0);
@@ -1137,7 +1319,7 @@
          *************************************************************************/
 
         publ.init = function (options) {
-            if (priv.options.debug) console.log('watable initialization...');
+            priv.log('watable initialization...');
             //merge supplied options with defaults
             $.extend(priv.options, defaults, options);
             priv.init();
@@ -1145,13 +1327,13 @@
         };
 
         publ.update = function (callback, skipCols, resetChecked) {
-            if (priv.options.debug) console.log('publ.update called');
+            priv.log('publ.update called');
             priv.update(callback, skipCols, resetChecked);
             return publ;
         };
 
         publ.getData = function (checked, filtered) {
-            if (priv.options.debug) console.log('publ.getData called');
+            priv.log('publ.getData called');
             checked = checked || false;
             filtered = filtered || false;
 
@@ -1180,13 +1362,13 @@
         };
 
         publ.setData = function (data, skipCols, resetChecked) {
-            if (priv.options.debug) console.log('publ.setData called');
+            priv.log('publ.setData called');
             priv.setData(data, skipCols, resetChecked);
             return publ;
         };
 
         publ.option = function (option, val) {
-            if (priv.options.debug) console.log('publ.option called');
+            priv.log('publ.option called');
             if (val == undefined) return priv.options[option];
             priv.options[option] = val;
             _head = undefined;
@@ -1209,7 +1391,7 @@
 
     String.prototype.format = String.prototype.f = function () {
         var s = this;
-        i = arguments.length;
+        var i = arguments.length;
         while (i--) s = s.replace(new RegExp('\\{' + i + '\\}', 'gm'), arguments[i]);
         return s;
     };
@@ -1219,6 +1401,6 @@
     Object.keys = Object.keys || function(o) { var result = []; for(var name in o) {  if (o.hasOwnProperty(name)) result.push(name); } return result; };
     String.prototype.trim = String.prototype.trim || function () { return this.replace(/^\s+|\s+$/g,''); };
     Date.now = Date.now || function() { return +new Date; };
-    console = window.console || { log:function(){} };
+    console = window.console || { log:function(){}, warn:function(){} };
 
 })(jQuery);
