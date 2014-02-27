@@ -660,12 +660,16 @@
         /*
          calls the webservice(if defined).
          */
-        priv.update = function (callback, skipCols, resetChecked) {
+        priv.update = function (callback, skipCols, resetChecked, newUrlData) {
             if (!priv.options.url) {
                 priv.log('no url found');
                 return;
             }
-
+			
+			if (newUrlData) {
+				priv.options.urlData = newUrlData;
+			}
+			
             priv.log('requesting data from url:{0} data:{1}'.f(priv.options.url, JSON.stringify(priv.options.urlData) || ''));
             var start = new priv.ext.XDate();
 
@@ -1329,9 +1333,9 @@
             return publ;
         };
 
-        publ.update = function (callback, skipCols, resetChecked) {
+        publ.update = function (callback, skipCols, resetChecked, newUrlData) {
             priv.log('publ.update called');
-            priv.update(callback, skipCols, resetChecked);
+            priv.update(callback, skipCols, resetChecked, newUrlData);
             return publ;
         };
 
