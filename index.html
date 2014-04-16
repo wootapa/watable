@@ -2,10 +2,10 @@
 <html>
 <head>
     <title>WATable</title>
-    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.js" type="text/javascript"></script>
-    <script src="http://netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/js/bootstrap.min.js" type="text/javascript"></script>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.js" type="text/javascript"></script>
+    <script src="http://netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js" type="text/javascript"></script>
     <script src="jquery.watable.js" type="text/javascript" charset="utf-8"></script>
-    <link rel='stylesheet' href="http://netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.min.css"/>
+    <link rel='stylesheet' href="http://netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css" />
     <link rel='stylesheet' href='watable.css'/>
     <style type="text/css">
         body { padding: 30px; font-size: 12px }
@@ -58,10 +58,10 @@
                 filter: true,         //If true, the filter fields can be toggled visible and hidden.
                 columnPicker: true,   //if true, the columnPicker can be toggled visible and hidden.
                 custom: [             //Add any other elements here. Here is a refresh and export example.
-                  $('<a href="#" class="refresh"><i class="icon-refresh"></i>&nbsp;Refresh</a>'),
-                  $('<a href="#" class="export_all"><i class="icon-share"></i>&nbsp;Export all rows</a>'),
-                  $('<a href="#" class="export_checked"><i class="icon-share"></i>&nbsp;Export checked rows</a>'),
-                  $('<a href="#" class="export_filtered"><i class="icon-share"></i>&nbsp;Export filtered rows</a>')
+                  $('<a href="#" class="refresh"><span class="glyphicon glyphicon-refresh"></span>&nbsp;Refresh</a>'),
+                  $('<a href="#" class="export_all"><span class="glyphicon glyphicon-share"></span>&nbsp;Export all rows</a>'),
+                  $('<a href="#" class="export_checked"><span class="glyphicon glyphicon-share"></span>&nbsp;Export checked rows</a>'),
+                  $('<a href="#" class="export_filtered"><span class="glyphicon glyphicon-share"></span>&nbsp;Export filtered rows</a>')
                 ]
             },
             tableCreated: function(data) {    //Fires when the table is created / recreated. Use it if you want to manipulate the table in any way.
@@ -136,7 +136,7 @@
             userId: {
                 index: 1, //The order this column should appear in the table
                 type: "number", //The type. Possible are string, number, bool, date(in milliseconds).
-                friendly: "<i class='icon-user'></i>",  //Name that will be used in header. Can also be any html as shown here.
+                friendly: "<span class='glyphicon glyphicon-user'></span>",  //Name that will be used in header. Can also be any html as shown here.
                 format: "<a href='#' class='userId' target='_blank'>{0}</a>",  //Used to format the data anything you want. Use {0} as placeholder for the actual data.
                 unique: true,  //This is required if you want checkable rows, or to use the rowClicked callback. Be certain the values are really unique or weird things will happen.
                 sortOrder: "asc", //Data will initially be sorted by this column. Possible are "asc" or "desc"
@@ -170,7 +170,7 @@
             height: {
                 index: 5,
                 type: "number",
-                friendly: "Height(cm)",
+                friendly: "Height",
                 hidden:true //Hides the column. Useful if you want this value later on but no visible to user. It's available to be visible if columnPicker is enabled.
             },
             important: {

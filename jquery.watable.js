@@ -1,5 +1,5 @@
 /*
- WATable 1.08
+ WATable 1.09
  Copyright (c) 2012 Andreas Petersson(apesv03@gmail.com)
  http://wootapa-watable.appspot.com/
 
@@ -246,7 +246,7 @@
                         link.appendTo(headCell);
 
                         if (props.tooltip) {
-                            $('<i class="icon-info-sign"></i>').tooltip({
+                            $('<span class="glyphicon glyphicon-info-sign"></span>').tooltip({
                                 title: props.tooltip.trim(),
                                 html: true,
                                 container: 'body',
@@ -260,8 +260,8 @@
 
                         //Add sort arrow
                         if (column == _currSortCol) {
-                            if (_currSortFlip) $('<i class="icon-chevron-down pull-right"></i>').appendTo(headCell);
-                            else $('<i class="icon-chevron-up pull-right"></i>').appendTo(headCell);
+                            if (_currSortFlip) $('<span class="glyphicon glyphicon-chevron-down pull-right"></span>').appendTo(headCell);
+                            else $('<span class="glyphicon glyphicon-chevron-up pull-right"></span>').appendTo(headCell);
                         }
                     }
                 }
@@ -339,8 +339,8 @@
                                         var today = new priv.ext.XDate(false).setHours(0, 0, 0, 0).toString('yyyy-MM-dd');
                                         var dp = $('<div style="float:right" class="date" data-date="{0}" data-date-format="{1}" />'.f(today, 'yyyy-mm-dd')).appendTo(elem);
                                         $('<input style="display:none" type="text"  />').appendTo(dp);
-                                        $('<span class="add-on"><i class="icon-chevron-right"></i></span>').on('click', {op: "l"}, priv.dpOpChanged).appendTo(dp);
-                                        $('<span class="add-on"><i class="icon-chevron-left"></i></span>').on('click', {op: "r"}, priv.dpOpChanged).appendTo(dp);
+                                        $('<span class="add-on glyphicon glyphicon-chevron-right"></span>').on('click', {op: "l"}, priv.dpOpChanged).appendTo(dp);
+                                        $('<span class="add-on glyphicon glyphicon-chevron-left"></span>').on('click', {op: "r"}, priv.dpOpChanged).appendTo(dp);
                                         dp.datepicker({weekStart:1});
                                         dp.on('changeDate', {column: column, input: $('input.filter', elem)}, priv.dpClicked);
                                     }
@@ -416,7 +416,7 @@
 
                 //slice out the chunk of data we need and create rows
                 $.each(_data.rows.slice(_data.fromRow, _data.toRow), function (index, props) {
-                    var row = $('<tr></tr>').appendTo(_body);
+                    var row = $('<tr class="{0}"></tr>'.f(index%2 == 0 ? 'odd' : 'even')).appendTo(_body);
 
                     //create checkbox
                     if (_uniqueCol && priv.options.checkboxes) {
@@ -565,8 +565,7 @@
 
                 var footToolbar = $('<div class="btn-toolbar"></div>').appendTo(footCell);
                 var footDiv = $('<div class="btn-group"></div>').appendTo(footToolbar);
-                var footPagerDiv = $('<div class="pagination"></div>').appendTo(footDiv);
-                var footPagerUl = $('<ul></ul>').appendTo(footPagerDiv);
+                var footPagerUl = $('<ul class="pagination"></ul>').appendTo(footDiv);
 
                 $('<li class="{0}"><a href="#">«</a></li>'.f(_currPage == 1 ? 'disabled' : ''))
                     .on('click', {pageIndex: _currPage - 1}, priv.pageChanged).appendTo(footPagerUl);
@@ -588,7 +587,7 @@
                 //create pagesize dropdown
                 if (priv.options.pageSizes.length) {
                     var div = $('<div class="btn-group dropup pagesize"></div>').appendTo(footToolbar);
-                    var btn = $('<button class="btn dropdown-toggle" data-toggle="dropdown" href="#">Rows&nbsp;</button>').appendTo(div);
+                    var btn = $('<button class="btn btn-default dropdown-toggle" data-toggle="dropdown" href="#">Rows&nbsp;</button>').appendTo(div);
                     var span = $('<span class="caret"></span>').appendTo(btn);
                     var ul = $('<ul class="dropdown-menu">').appendTo(div);
 
@@ -602,23 +601,26 @@
                 //create columnpicker dropdown
                 if (priv.options.columnPicker) {
                     var div = $('<div class="btn-group dropup columnpicker"></div>').appendTo(footToolbar);
-                    var btn = $('<button class="btn dropdown-toggle" data-toggle="dropdown" href="#">Columns&nbsp;</button>').appendTo(div);
+                    var btn = $('<button class="btn btn-default dropdown-toggle" data-toggle="dropdown" href="#">Columns&nbsp;</button>').appendTo(div);
                     var span = $('<span class="caret"></span>').appendTo(btn);
                     var ul = $('<ul class="dropdown-menu">').appendTo(div);
 
-                    $.each(_data.cols, function (col, props) {
+                    for (var i = 0; i < colsSorted.length; i++) {
+                        var col = colsSorted[i];
+                        var props = _data.cols[col];
+
                         if (props.type != "unique") {
                             var li = $('<li></li>').appendTo(ul);
                             $('<input {0} type="checkbox" title="{1}" value="{1}" >&nbsp;{2}</input>'.f(props.hidden ? '' : 'checked', col, props.friendly || col)).appendTo(li);
                         }
-                    });
+                    }
                     div.on('click', 'input', priv.columnPickerClicked);
                 }
 
                 //create actions dropdown
                 if (priv.options.actions) {
                     var div = $('<div class="btn-group dropup actions"></div>').appendTo(footToolbar);
-                    var btn = $('<button class="btn dropdown-toggle" data-toggle="dropdown" href="#"><i class="icon-list"></i>&nbsp;</button>').appendTo(div);
+                    var btn = $('<button class="btn btn-default dropdown-toggle" data-toggle="dropdown" href="#"><span class="glyphicon glyphicon-list"></span>&nbsp;</button>').appendTo(div);
                     var span = $('<span class="caret"></span>').appendTo(btn);
                     var ul = $('<ul class="dropdown-menu">').appendTo(div);
 

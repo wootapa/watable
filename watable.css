@@ -10,18 +10,15 @@
 .watable p {
   margin: 0;
 }
-.watable td,
-.watable th {
-  line-height: 18px;
+
+.watable th,
+.watable td {
+  border-width: 1px !important;
 }
 
-.watable i {
+.watable .glyphicon {
   margin: 0 0 0 2px;
   opacity: 0.5;
-}
-
-.watable tfoot .btn {
-  height: 34px;
 }
 
 .watable span.filter {
@@ -40,26 +37,16 @@
 }
 
 .watable .btn-toolbar {
-  margin: 2px 0 0 0;
-}
-
-.watable .btn-toolbar .btn-group {
-  vertical-align: top;
+  margin-bottom: -5px;
 }
 
 .watable .pagination {
   margin: 0;
-  height: 34px;
-}
-
-.watable .pagination a {
-  line-height: 24px;
 }
 
 .watable input[type=checkbox] {
   margin: 0;
   padding: 0;
-  height: 13px;
 }
 
 .watable input[type=text].filter {
@@ -69,6 +56,7 @@
   border: none;
   width: 80px;
   float: left;
+  background-color: transparent;
 }
 
 .watable .date-wrap {
@@ -94,8 +82,6 @@
   padding: 0;
   margin: 0;
 }
-
-
 
 /* Only for demo purposes */
 .watable div.green {
