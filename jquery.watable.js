@@ -52,8 +52,9 @@
                 bool: {},
                 date: {}
             },
-            transition: undefined, //transition type when paging
-            transitionDuration: 0.3 //duration of transition in seconds
+            transition: undefined, 		// transition type when paging
+            transitionDuration: 0.3, 	// duration of transition in seconds
+            tableCondensed: false,		// Use table-condensed from Bootstrap
         };
 
         /* bundled scripts */
@@ -197,7 +198,8 @@
             //create table itself
             if (!_table) {
                 _head = _body = _foot = undefined;
-                _table = $('<table class="watable table table-striped table-hover table-bordered table-condensed"></table>').appendTo(_cont);
+					 var _tableCondensed = priv.options.tableCondensed ? 'table-condensed' : '';
+                _table = $('<table class="watable table table-striped table-hover table-bordered '+_tableCondensed+'"></table>').appendTo(_cont);
             }
 
             //create the header which will later hold both sorting and filtering
