@@ -42,6 +42,7 @@
             actions: '', //holds action links
             pageSize: 10, //current pagesize
             pageSizes: [10, 20, 30, 40, 50, 'All'], //available pagesizes
+            hideEmptyPagesOnPager: false, //remove pages from pager if no rows (overrides 5 page minimum when true)
             hidePagerOnEmpty: false, //removes pager if no rows
             preFill: false, //prefill table with empty rows
             sorting: true, // enable column sorting
@@ -561,7 +562,10 @@
                     lowerPage -= diff;
                 }
                 if (lowerPage < 1) lowerPage = 1;
-                if (upperPage < 5) upperPage = 5;
+                if (upperPage < 5 &&
+                    priv.options.hideEmptyPagesOnPager == false) {
+                    upperPage = 5;
+                }
 
                 var footToolbar = $('<div class="btn-toolbar"></div>').appendTo(footCell);
                 var footDiv = $('<div class="btn-group"></div>').appendTo(footToolbar);
