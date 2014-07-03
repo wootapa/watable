@@ -1,5 +1,5 @@
 /*
- WATable 1.09
+ WATable 1.10
  Copyright (c) 2012 Andreas Petersson(apesv03@gmail.com)
  http://wootapa-watable.appspot.com/
 
@@ -52,8 +52,9 @@
                 bool: {},
                 date: {}
             },
-            transition: undefined, //transition type when paging
-            transitionDuration: 0.3 //duration of transition in seconds
+            transition: undefined, 		// transition type when paging
+            transitionDuration: 0.3, 	// duration of transition in seconds
+            tableCondensed: false,		// Use table-condensed from Bootstrap
         };
 
         /* bundled scripts */
@@ -83,6 +84,7 @@
         var _checkToggleChecked = false; //check-all toggle state
 
         var _vendors = ["webkit", "moz", "Moz", "ms", "o", "O"]; //vendors prefixes. used for not yet officially supported features.
+		  var _css_aligns = ['left', 'center', 'right'];
         var _transition = {
             supported: undefined, //true if browser supports transitions
             doTransition: false,  //true if allowed to transition
@@ -197,7 +199,8 @@
             //create table itself
             if (!_table) {
                 _head = _body = _foot = undefined;
-                _table = $('<table class="watable table table-striped table-hover table-bordered table-condensed"></table>').appendTo(_cont);
+					 var _tableCondensed = priv.options.tableCondensed ? 'table-condensed' : '';
+                _table = $('<table class="watable table table-striped table-hover table-bordered '+_tableCondensed+'"></table>').appendTo(_cont);
             }
 
             //create the header which will later hold both sorting and filtering
@@ -233,15 +236,19 @@
                     var column = colsSorted[i];
                     var props = _data.cols[column];
 
+
+                    var _hdr_width = typeof props.width !== 'undefined' ? 'width:'+parseInt(props.width)+'px;' : '';
+                    var _hdr_align = typeof props.hdr_align !== 'undefined' && $.inArray(props.hdr_align, _css_aligns) > -1 ? 'text-align:'+props.hdr_align+';width:100%;' : '';
+
                     if (!props.hidden) {
-                        var headCell = $('<th></th>').appendTo(_headSort);
+                        var headCell = $('<th style="'+_hdr_width+'"></th>').appendTo(_headSort);
                         var link;
                         if(priv.options.sorting && props.sorting !== false) {
-                            link = $('<a class="pull-left" href="#">{0}</a>'.f(props.friendly || column));
+                            link = $('<a class="pull-left" href="#" style="'+_hdr_align+'">{0}</a>'.f(props.friendly || column));
                             link.on('click', {column: column}, priv.columnClicked);
                         }
                         else {
-                            link = $('<span class="pull-left">{0}</span>'.f(props.friendly || column));
+                            link = $('<span class="pull-left" style="'+_hdr_align+'">{0}</span>'.f(props.friendly || column));
                         }
                         link.appendTo(headCell);
 
@@ -433,8 +440,10 @@
                         if (!_data.cols[key]) return;
                         if (_data.cols[key].unique) row.data('unique', val);
 
+							   var _col_align = typeof _data.cols[key].align !== 'undefined' && $.inArray(_data.cols[key].align, _css_aligns) > -1 ? 'text-align:'+_data.cols[key].align+';' : '';
+
                         if (!_data.cols[key].hidden) {
-                            var cell = $('<td></td>').appendTo(row);
+                            var cell = $('<td style="'+_col_align+'"></td>').appendTo(row);
                             cell.data('column', key);
                             if (val === undefined) continue;
 
