@@ -439,6 +439,9 @@
                             if (val === undefined) continue;
 
                             var format = props[key + 'Format'] || _data.cols[key].format || '{0}';
+                            if (_data.cols[key].customFormatter) {
+                                format = _data.cols[key].customFormatter(val, props, _data.cols[key]);
+                            }
 
                             switch (_data.cols[key].type) {
                                 case "string":
