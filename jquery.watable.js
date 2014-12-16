@@ -356,6 +356,7 @@
                                 elem.on('click', {column: column}, priv.filterChanged);
                                 break;
                             case "string":
+                            case "text":
                                 if (placeHolder == undefined) placeHolder = priv.options.types.string.placeHolder;
                                 placeHolder = (placeHolder === true || placeHolder == undefined) ? 'John Doe' : placeHolder === false ? '' : placeHolder;
                                 if (tooltip == undefined) tooltip = priv.options.types.string.filterTooltip;
@@ -441,6 +442,9 @@
                             var format = props[key + 'Format'] || _data.cols[key].format || '{0}';
 
                             switch (_data.cols[key].type) {
+                                case "text":
+                                    cell.text(val);
+                                    break;
                                 case "string":
                                     cell.html(format.f(val));
                                     break;
@@ -807,6 +811,7 @@
                 priv.log('filtering on text:{0} col:{1} type:{2} '.f(colProps.filter, colProps.col.column, colProps.col.type));
 
                 switch (colProps.col.type) {
+                    case "text":
                     case "string":
                         var filter = colProps.filter;
                         var ne = false, regex = false, validRegex = true;
