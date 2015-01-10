@@ -1,5 +1,5 @@
 /*
- WATable 1.09
+ WATable 1.10
  Copyright (c) 2012 Andreas Petersson(apesv03@gmail.com)
  http://wootapa-watable.appspot.com/
 
@@ -41,11 +41,13 @@
             checkAllToggle: true, //show check all toggle
             actions: '', //holds action links
             pageSize: 10, //current pagesize
+            pageSizePadding: false, //pad with empty rows
             pageSizes: [10, 20, 30, 40, 50, 'All'], //available pagesizes
             hidePagerOnEmpty: false, //removes pager if no rows
             preFill: false, //prefill table with empty rows
             sorting: true, // enable column sorting
             sortEmptyLast: true, //empty values will be shown last
+            dataBind: true, //updates table when detecting row data changes
             types: { //type specific options
                 string: {},
                 number: {},
@@ -69,17 +71,21 @@
         var _body; //table body
         var _foot; //table footer
 
-        var _data;  //columns and rows
+        var _data = {};  //columns and rows
+        _data.meta = {
+            rowsLookup: {}, //array for fast row lookup
+            rowsChecked: {}, //array with checked rows
+            rowsRendered: {} //array with currently rendered rows
+        };
         var _currPage = 1; //current page
         var _pageSize; //current pagesize
-        var _totalPages; //total pages
+        var _totalPages = 1; //total pages
         var _currSortCol; //current sorting column
         var _currSortFlip = false; //current sorting direction
         var _currDpOp; //clicked datepicker operator
         var _filterCols = {}; //array with current filters
         var _filterTimeout; //timer for delayed filtering
         var _uniqueCol; //reference to column with the unique property
-        var _uniqueCols = {}; //array with checked rows
         var _checkToggleChecked = false; //check-all toggle state
 
         var _vendors = ["webkit", "moz", "Moz", "ms", "o", "O"]; //vendors prefixes. used for not yet officially supported features.
@@ -409,78 +415,59 @@
                 _body.on('click', 'td', priv.rowClicked);
 
                 //find out what rows to show next...
-                var rowsAdded = 0;
-                _data.toRow = _data.fromRow + priv.options.pageSize;
-                if (_data.toRow > _data.rows.length)
-                    _data.toRow = _data.rows.length;
+                _pageSize = priv.options.pageSize == -1 ? _data.rows.length : Math.min(priv.options.pageSize, _data.rows.length);
+                _totalPages = Math.ceil(_data.rows.length / _pageSize) || 1;
+                _currPage = Math.min(_totalPages, _currPage);
+                _data.meta.rowsRendered = {};
+
+                if (_currPage > 1) {
+                    _data.meta.fromRow = Math.max((_pageSize * _currPage) - _pageSize, 0);
+                    _data.meta.toRow = Math.min(_data.meta.fromRow + _pageSize, _data.rows.length);
+                }
+                else {
+                    _data.meta.fromRow = 0;
+                    _data.meta.toRow = _pageSize;
+                }
 
                 //slice out the chunk of data we need and create rows
-                $.each(_data.rows.slice(_data.fromRow, _data.toRow), function (index, props) {
-                    var row = $('<tr class="{0}"></tr>'.f(index%2 == 0 ? 'odd' : 'even')).appendTo(_body);
+                $.each(_data.rows.slice(_data.meta.fromRow, _data.meta.toRow), function (index, row) {
+
+                    var rowRendered = $('<tr class="{0}"></tr>'.f(index%2 == 0 ? 'odd' : 'even')).appendTo(_body);
+
+                    if (_uniqueCol) {
+                        _data.meta.rowsRendered[row[_uniqueCol]] = rowRendered;
+                    }
 
                     //create checkbox
                     if (_uniqueCol && priv.options.checkboxes) {
-                        var check = _uniqueCols[props[_uniqueCol]] != undefined ? 'checked' : '';
-                        var checkable = props['checkable'] === false ? 'disabled' : '';
-                        var cell = $('<td></td>').appendTo(row);
+                        var check = _data.meta.rowsChecked[row[_uniqueCol]] != undefined ? 'checked' : '';
+                        var checkable = row['row-checkable'] === false ? 'disabled' : '';
+                        var cell = $('<td></td>').appendTo(rowRendered);
                         $('<input class="unique" {0} {1} type="checkbox" />'.f(check, checkable)).appendTo(cell);
                     }
 
                     //create cells
                     for (var i = 0; i < colsSorted.length; i++) {
-                        var key = colsSorted[i];
-                        var val = props[key];
-                        if (!_data.cols[key]) return;
-                        if (_data.cols[key].unique) row.data('unique', val);
+                        var col = colsSorted[i];
 
-                        if (!_data.cols[key].hidden) {
-                            var cell = $('<td></td>').appendTo(row);
-                            cell.data('column', key);
-                            if (val === undefined) continue;
-
-                            var format = props[key + 'Format'] || _data.cols[key].format || '{0}';
-
-                            switch (_data.cols[key].type) {
-                                case "string":
-                                    cell.html(format.f(val));
-                                    break;
-                                case "number":
-                                    val = (+val);
-                                    var forceDecimals = !isNaN(_data.cols[key].decimals);
-                                    if (forceDecimals) cell.html(format.f(val.toFixed(_data.cols[key].decimals)));
-                                    else {
-                                        (val || 0) % 1 === 0
-                                            ? cell.html(format.f(val))
-                                            : cell.html(format.f(val.toFixed(priv.options.types.number.decimals || 2)));
-                                    }
-                                    break;
-                                case "date":
-                                    val = new priv.ext.XDate(val, priv.options.types.date.utc === true).toString(priv.options.types.date.format || 'yyyy-MM-dd HH:mm:ss');
-                                    cell.html(format.f(val));
-                                    break;
-                                case "bool":
-                                    $('<input type="checkbox" {0} disabled />'.f(val ? "checked" : "")).appendTo(cell);
-                                    break;
-                            }
+                        if (!_data.cols[col]) {
+                            return;
                         }
-                    }
-                    rowsAdded++;
-
-                    //enough rows created?
-                    if (rowsAdded >= priv.options.pageSize) {
-                        _data.toRow = _data.fromRow + rowsAdded;
-                        return false;
+                        if (_data.cols[col].unique) {
+                            rowRendered.data('unique', row[col]);
+                        }
+                        if (!_data.cols[col].hidden) {
+                            var cell = $('<td></td>');
+                            priv.renderCell(cell, col, row, rowRendered);
+                            cell.appendTo(rowRendered);
+                        }
                     }
                 });
 
-                if (_currPage == 1) {
-                    _pageSize = rowsAdded;
-                    _totalPages = Math.round(Math.ceil(_data.rows.length / _pageSize));
-                }
-
-                //pad with empty rows if we're at last page.
-                if (_currPage == _totalPages) {
-                    while (rowsAdded < _pageSize) {
+                //pad with empty rows?
+                if (priv.options.pageSize != -1 && (_currPage == _totalPages && _currPage > 1) || priv.options.pageSizePadding) {
+                    var loops = priv.options.pageSize - (_data.meta.toRow - _data.meta.fromRow);
+                    while (loops-- >0) {
                         var row = $('<tr></tr>').appendTo(_body);
 
                         if (_uniqueCol && priv.options.checkboxes) {
@@ -491,7 +478,6 @@
                         $.each(_data.cols, function (column, props) {
                             if (!props.hidden) $('<td>&nbsp;</td>').appendTo(row);
                         });
-                        rowsAdded++;
                     }
                 }
 
@@ -532,8 +518,16 @@
                     prevBody.addClass('animated {0}'.f(transition.tout));
                     _transition.doTransition = false;
                 }
-                else
+                else {
                     _body.show(0);
+                }
+
+                //recreate footer?
+                _data.meta.rowsFilteredCount = _data.meta.rowsFilteredCount || 0;
+                if (_data.meta.rowsFilteredCount != _data.rows.length) {
+                    _foot = undefined;
+                    _data.meta.rowsFilteredCount = _data.rows.length;
+                }
             }
 
             //create the footer
@@ -546,10 +540,9 @@
 
                 //create summary
                 if (_data.rows.length > 0)
-                    $('<p>Rows {0}-{1} of {2}</p>'.f(_data.fromRow + 1, Math.min(_data.toRow, _data.rows.length), _data.rows.length)).appendTo(footCell);
+                    $('<p>Rows {0}-{1} of {2}</p>'.f(_data.meta.fromRow + 1, Math.min(_data.meta.toRow, _data.rows.length), _data.rows.length)).appendTo(footCell);
                 else {
                     $('<p>No results</p>').appendTo(footCell);
-                    _totalPages = 0;
                 }
 
                 //create the pager.
@@ -653,10 +646,81 @@
 
             if (_data.rows.length == 0 && priv.options.hidePagerOnEmpty)
                 $('.btn-toolbar', _foot).remove();
-            priv.log('table created in {0} ms.'.f(new priv.ext.XDate() - start));
+            priv.log('table created in {0}ms.'.f(new priv.ext.XDate() - start));
             if (typeof priv.options.tableCreated == 'function')
                 priv.options.tableCreated.call(_table.get(0), {table: _table.get(0)});
 
+        };
+
+        /*
+         renders a cell
+         */
+        priv.renderCell= function(cell, col, row, renderedRow) {
+            cell.data('column', col);
+
+            //add any cell level classes
+            cell.removeClass();
+            var cellClasses = row[col + 'Class'];
+            if (cellClasses) {
+                $.each(cellClasses.split(','), function(i, cellClass) {
+                    cellClass = cellClass.trim();
+                    if (!cell.hasClass(cellClass))
+                        cell.addClass(cellClass);
+                });
+            }
+
+            //add any row level classes here as well
+            var rowClasses = row['row-class'] || "";
+            var newClasses = $.grep(rowClasses.split(','),function(n){ return(n)});
+            var oldClasses = renderedRow.attr('class').split(' ');
+
+            var addClasses = $.unique($(newClasses)).not($(oldClasses)).get();
+            $.each(addClasses, function(i, cls) {
+                renderedRow.addClass(cls);
+            });
+            var removeClasses = $.unique($(oldClasses)).not($(newClasses.concat(['odd','even']))).get();
+            $.each(removeClasses, function(i, cls) {
+                renderedRow.removeClass(cls);
+            });
+
+            if (_uniqueCol) {
+                var cellClass = 'watable-col-{0}'.f(col);
+                if (!cell.hasClass(cellClass))
+                    cell.addClass(cellClass);
+            }
+
+            var val = row[col];
+            if (val === undefined) {
+                cell.html('');
+                return;
+            }
+
+            var format = row[col + 'Format'] || _data.cols[col].format || '{0}';
+
+            switch (_data.cols[col].type) {
+                case "string":
+                    cell.html(format.f(val));
+                    break;
+                case "number":
+                    val = (+val);
+                    var forceDecimals = !isNaN(_data.cols[col].decimals);
+                    if (forceDecimals) {
+                        cell.html(format.f(val.toFixed(_data.cols[col].decimals)));
+                    }
+                    else {
+                        (val || 0) % 1 === 0
+                            ? cell.html(format.f(val))
+                            : cell.html(format.f(val.toFixed(priv.options.types.number.decimals || 2)));
+                    }
+                    break;
+                case "date":
+                    val = new priv.ext.XDate(val, _data.cols[col].dateUTC === true || priv.options.types.date.utc === true).toString(_data.cols[col].dateFormat || priv.options.types.date.format || 'yyyy-MM-dd HH:mm:ss');
+                    cell.html(format.f(val));
+                    break;
+                case "bool":
+                    $('<input type="checkbox" {0} disabled />'.f(val ? "checked" : "")).appendTo(cell);
+                    break;
+            }
         };
 
         /*
@@ -679,7 +743,7 @@
                 data: priv.options.urlData,
                 async: true,
                 success: function (data) {
-                    priv.log('request finished in {0} ms.'.f(new priv.ext.XDate() - start));
+                    priv.log('request finished in {0}ms.'.f(new priv.ext.XDate() - start));
 
                     //assign the new data
                     if (data.d && data.d.cols)
@@ -695,13 +759,15 @@
             });
         };
 
+
         /*
          assigns the new data.
          */
         priv.setData = function (pData, skipCols, resetChecked) {
             var data = $.extend(true, {}, pData);
-            data.fromRow = _data && _data.fromRow || 0;
-            data.toRow = _data && _data.toRow || 0;
+            data.meta = {};
+            data.meta.fromRow = _data && _data.meta.fromRow || 0;
+            data.meta.toRow = _data && _data.meta.toRow || 0;
 
             //use previous column definitions?
             skipCols = skipCols || false;
@@ -709,21 +775,7 @@
             else _filterCols = {};
 
             _data = data;
-            _data.rowsOrg = _data.rows;
-
-            //we might have more/less data now. Recalculate stuff.
-            if (_currPage > 1) {
-                _data.toRow = Math.min(_data.rows.length, _data.toRow);
-                _data.fromRow = _data.toRow - _pageSize;
-                _data.fromRow = Math.max(_data.fromRow, 0);
-                _currPage = Math.ceil(_data.fromRow / _pageSize) + 1;
-                _totalPages = Math.ceil(_data.rows.length / _pageSize);
-            } else {
-                _data.fromRow = 0;
-                if (priv.options.pageSize != -1)
-                    _data.toRow = _data.fromRow + priv.options.pageSize;
-                _data.toRow = Math.max(_data.toRow, _data.rows.length);
-            }
+            _data.meta.rowsAll = pData.rows;
 
             //wash the new data a bit
             _uniqueCol = "";
@@ -759,12 +811,13 @@
                 }
             });
 
+            _data.meta.rowsLookup = {};
             //keep any previously checked rows around?
             if (resetChecked === true || resetChecked === undefined)
-                _uniqueCols = {};
+                _data.meta.rowsChecked = {};
             else {
-                for (var key in _uniqueCols)
-                    _uniqueCols[key] = priv.getRow(key);
+                for (var key in _data.meta.rowsChecked)
+                    _data.meta.rowsChecked[key] = _data.meta.rowsLookup[key];
             }
 
             if (_uniqueCol) {
@@ -776,30 +829,82 @@
                     hidden: true
                 };
 
-                //add rows that needs to be pre-checked
-                $.each(_data.rows, function (index, row) {
-                    if (row["checked"] === true)
-                        _uniqueCols[row[_uniqueCol]] = row;
+               _data.meta.rowObservers = {};
+                $.each(_data.meta.rowsAll, function (index, row) {
+                    //add rows that needs to be pre-checked
+                    if (row["row-checked"] === true) {
+                        _data.meta.rowsChecked[row[_uniqueCol]] = row;
+                    }
+                    //add the row to lookup object, so we can find it fast later on.
+                    _data.meta.rowsLookup[row[_uniqueCol]] = {
+                        index: index,
+                        row: row
+                    };
+                    //add row observer
+                    priv.addRowObserver(row);
                 });
+                 if (priv.options.dataBind) {
+                    _data.meta.rowsObserver = new ArrayObserver(_data.meta.rowsAll).open(priv.rowsChanged);
+                 }
             }
 
             _head = undefined;
             _body = undefined;
-            _foot = undefined;
             priv.filter();
             priv.sort();
             priv.createTable();
         };
 
         /*
-         filters the data.
+         returns data with all,checked,filtered or rendered rows
+         */
+        priv.getData = function (checked, filtered, rendered) {
+            checked = checked || false;
+            filtered = filtered || false;
+            rendered = rendered || false;
+
+            //copy complete _data object
+            var data = $.extend(true, {}, _data);
+            //remove internal stuff
+            delete data.cols["unique"];
+            delete data.meta;
+
+            //set the current filters
+            $.each(data.cols, function(col) {
+                if (_filterCols[col]) {
+                    data.cols[col].filter = _filterCols[col].filter;
+                }
+            });
+
+            //set rows
+            data.rows = filtered ? _data.rows : _data.meta.rowsAll;
+            if (checked) {
+                data.rows = $.map(data.rows, function (row, index) {
+                    if (_data.meta.rowsChecked[row[_uniqueCol]]) {
+                        return row;
+                    }
+                });
+            }
+            if (rendered) {
+                data.rows = $.map(data.rows, function (row, index) {
+                    if (_data.meta.rowsRendered[row[_uniqueCol]]) {
+                        return row;
+                    }
+                });
+            }
+            return data;
+        };
+
+        /*
+         filters all rows.
          */
         priv.filter = function () {
+            //get a fresh copy of the data
+            _data.rows = _data.meta.rowsAll.slice();
+
             if (!priv.options.filter) return;
             if (Object.keys(_filterCols).length == 0) return;
 
-            //get a fresh copy of the data
-            _data.rows = $.extend(true, {}, _data.rowsOrg);
             var start = new priv.ext.XDate();
 
             //for every column with a filter, run through the rows and return the matching rows
@@ -831,7 +936,14 @@
                         else filter = filter.toLowerCase();
 
                         _data.rows = $.map(_data.rows, function (row) {
+
                             var val = String(row[col]);
+                            if (!row[col + 'Format'] && !colProps.col.format) {
+                                colProps.col.autoFormat = true;
+                            }
+                            if (colProps.col.autoFormat) {
+                                row[col + 'Format'] = '';
+                            }
 
                             if (regex && validRegex) {
                                 var matches = val.match(filter);
@@ -848,7 +960,7 @@
                                         pos += matchMask.length;
                                     });
 
-                                    if (!row[col + 'Format'] && !colProps.col.format) {
+                                    if (colProps.col.autoFormat) {
                                         row[col + 'Format'] = val;
                                     }
                                     return row;
@@ -859,7 +971,7 @@
 
                                 if ((pos == -1 && ne) || filter === '') return row;
                                 else if (row[col] != undefined && pos >= 0 && !ne) {
-                                    if (!row[col + 'Format'] && !colProps.col.format) {
+                                    if (colProps.col.autoFormat) {
                                         var pre = val.substring(0, pos);
                                         var match = val.substring(pos, pos + filter.length);
                                         var post = val.substring(pos + filter.length, row[col].length);
@@ -934,23 +1046,20 @@
                         _data.rows = $.map(_data.rows, function (row) {
                             if (colProps.filter === '') return row;
                             var a = row[_uniqueCol];
-                            var b = _uniqueCols[a] ? _uniqueCols[a][_uniqueCol] : '';
+                            var b = _data.meta.rowsChecked[a] ? _data.meta.rowsChecked[a][_uniqueCol] : '';
                             if ((colProps.filter && a === b) || (!colProps.filter && b === '')) return row;
                         });
                         break;
                 }
                 if (colProps.filter === '') delete _filterCols[colProps.col.column];
             });
-            priv.log('filtering finished in {0} ms.'.f(new priv.ext.XDate() - start));
+            priv.log('filtering finished in {0}ms.'.f(new priv.ext.XDate() - start));
 
-            _currPage = 1;
-            _data.fromRow = 0;
             _body = undefined;
-            _foot = undefined;
         };
 
         /*
-         sorts the data on the current sorting column
+         sorts all rows on the current sorting column
          */
         priv.sort = function () {
             if (!_data.cols[_currSortCol]) _currSortCol = "";
@@ -986,23 +1095,7 @@
                     else return _currSortFlip ? 1 : -1;
                 }
             });
-            priv.log('sorting finished in {0} ms.'.f(new priv.ext.XDate() - start));
-        };
-
-        /*
-         helper that returns the underlying data by the unique value
-         */
-        priv.getRow = function (unique) {
-            var start = new priv.ext.XDate();
-            var row;
-            $.each(_data.rowsOrg, function (i, r) {
-                if (r[_uniqueCol] == unique) {
-                    row = r;
-                    return false;
-                }
-            });
-            priv.log('row lookup finished in {0} ms.'.f(new priv.ext.XDate() - start));
-            return row;
+            priv.log('sorting finished in {0}ms.'.f(new priv.ext.XDate() - start));
         };
 
         /*
@@ -1035,13 +1128,24 @@
             return vendorSupport;
         };
 
+        /*
+         adds an observer to a row
+         */
+        priv.addRowObserver = function(row) {
+            if (priv.options.dataBind) {
+                _data.meta.rowObservers[row[_uniqueCol]] = new ObjectObserver(row).open(function(added, removed, changed, getOldValueFn) {
+                    priv.rowChanged(row, added, removed, changed, getOldValueFn);
+                });
+            }
+        };
+
 
         /* Event Handlers
          *************************************************************************/
 
         /*
          when: typing a filter
-         what: triggers filtering on the value
+         what: data is filtered on the value
          */
         priv.filterChanged = function (e) {
             //clear old timer if we're typing fast enough
@@ -1090,7 +1194,7 @@
 
         /*
          when: changing page in pager
-         what: triggers table to be created with new page
+         what: table is created with new page
          */
         priv.pageChanged = function (e) {
             e.preventDefault();
@@ -1102,11 +1206,6 @@
             //set the new page
             _currPage = e.data.pageIndex;
             priv.log('paging to index:{0}'.f(_currPage));
-
-            //find out what rows to create
-            _data.fromRow = ((_currPage - 1) * _pageSize);
-            _data.toRow = _data.fromRow + _pageSize;
-            if (_data.toRow > _data.rows.length) _data.toRow = _data.rows.length;
 
             //trigger callback
             if (typeof priv.options.pageChanged == 'function') {
@@ -1123,7 +1222,7 @@
 
         /*
          when: changing pagesize in pagesize dropdown
-         what: triggers table to be created with new pagesize
+         what: table is created with new pagesize
          */
         priv.pageSizeChanged = function (e) {
             e.preventDefault();
@@ -1136,9 +1235,9 @@
 
             //revert to first page, as its gets messy otherwise.
             _currPage = 1;
-            _data.fromRow = 0;
-            _data.toRow = _data.fromRow + priv.options.pageSize;
-            if (_data.toRow > _data.rows.length) _data.toRow = _data.rows.length;
+            _data.meta.fromRow = 0;
+            _data.meta.toRow = _data.meta.fromRow + priv.options.pageSize;
+            if (_data.meta.toRow > _data.rows.length) _data.meta.toRow = _data.rows.length;
 
             //trigger callback
             if (typeof priv.options.pageSizeChanged == 'function') {
@@ -1155,7 +1254,7 @@
 
         /*
          when: clicking a column
-         what: triggers table to be sorted by the column
+         what: data is sorted on the column
          */
         priv.columnClicked = function (e) {
             e.preventDefault();
@@ -1182,7 +1281,7 @@
 
         /*
          when: clicking a column in columnpicker
-         what: triggers table to show/hide the column
+         what: show/hides the column
          */
         priv.columnPickerClicked = function (e) {
             e.stopPropagation();
@@ -1210,25 +1309,27 @@
             if (elem.is(':checked')) {
                 var start = new priv.ext.XDate();
                 //for every row(except non checkables), add it to the checked array
-                $.each(_data.rows, function (index, props) {
-                    var row = _data.rows[index];
-                    if (row.checkable === false) return;
-                    _uniqueCols[props[_uniqueCol]] = row;
+                var count = 0;
+                $.each(_data.rows, function (index, row) {
+                    if (row['row-checkable'] === false) return;
+                    if (!_data.meta.rowsChecked[row[_uniqueCol]]) {
+                        _data.meta.rowsChecked[row[_uniqueCol]] = row;
+                        count++;
+                    }
                 });
-                priv.log('{0} rows checked in {1} ms.'.f(_data.rows.length, new priv.ext.XDate() - start));
+                priv.log('{0} rows checked in {1}ms.'.f(count, new priv.ext.XDate() - start));
                 _checkToggleChecked = true;
             }
             else {
                 var start = new priv.ext.XDate();
                 //for every checked row(except non checkables), remove it from checked array
-                for (var key in _uniqueCols) {
-                    var row = _uniqueCols[key];
-                    if (row.checkable === false)
-                        continue;
-                    else
-                        delete _uniqueCols[key];
-                }
-                priv.log('{0} rows unchecked in {1} ms.'.f(_data.rows.length, new priv.ext.XDate() - start));
+                var count = 0;
+                $.each(_data.meta.rowsChecked, function(index, row) {
+                    if (row['row-checkable'] === false) return;
+                    delete _data.meta.rowsChecked[row[_uniqueCol]];
+                    count++;
+                });
+                priv.log('{0} rows unchecked in {1}ms.'.f(count, new priv.ext.XDate() - start));
                 _checkToggleChecked = false;
             }
             _body = undefined;
@@ -1247,8 +1348,12 @@
             priv.log('row({0}) {1}'.f(unique, elem.is(':checked') ? 'checked' : 'unchecked'));
 
             //store the row in checked array
-            if (elem.is(':checked')) _uniqueCols[unique] = priv.getRow(unique);
-            else delete _uniqueCols[unique];
+            if (elem.is(':checked')) {
+                _data.meta.rowsChecked[unique] = _data.meta.rowsLookup[unique];
+            }
+            else {
+                delete _data.meta.rowsChecked[unique];
+            }
         };
 
         /*
@@ -1260,22 +1365,40 @@
                 priv.log('no unique column specified');
                 return;
             }
+            var elem = $(this);
+            var unique = elem.closest('tr').data('unique');
+            if (!unique) return;
 
             //gather callback data
-            var elem = $(this);
             var column = _data.cols[elem.data('column')];
-            var unique = elem.closest('tr').data('unique');
-            var row = priv.getRow(unique);
-            var isChecked = elem.closest('tr').find('.unique').is(':checked');
+            var row =  _data.meta.rowsLookup[unique].row;
+            var index = _data.meta.rowsLookup[unique].index;
+            var isChecked = _data.meta.rowsChecked[unique] != undefined;
 
             //trigger callback
             if (typeof priv.options.rowClicked == 'function') {
-                priv.options.rowClicked.call(e.target, {
+                var callBackData = {
                     event: e,
                     row: row,
+                    index: index,
                     column: column,
                     checked: isChecked
-                });
+                };
+                priv.options.rowClicked.call(e.target, callBackData);
+
+                //check for new checked state
+                if (row['row-checkable'] !== false) {
+                    var target = $(e.target);
+
+                    if (target.hasClass('unique') && target.prop('checked') != callBackData.checked) {
+                        e.preventDefault();
+                    }
+                    if (callBackData.checked != isChecked) {
+                        var checkbox = $('.unique', elem.closest('tr'));
+                        checkbox.prop('checked', callBackData.checked);
+                        priv.rowChecked.call(checkbox, e);
+                    }
+                }
             }
 
         };
@@ -1292,13 +1415,13 @@
 
         /*
          when: clicking a datepicker date
-         what: triggers filtering on the date
+         what: filters on the date
          */
         priv.dpClicked = function (e) {
             priv.log('dp date:{0} clicked'.f(new priv.ext.XDate(e.date, priv.options.types.date.utc === true).toString('yyyy-MM-dd')));
 
             e.preventDefault();
-            input = $(this).prev('input.filter').get(0);
+            var input = $(this).prev('input.filter').get(0);
             Placeholders.disable(input); //Remove date placeholders for IE
 
             var today = new priv.ext.XDate(false).setHours(0, 0, 0, 0);
@@ -1319,6 +1442,119 @@
             filter.trigger('keyup');
         };
 
+        /*
+         when: rows array are modified
+         what: table gets recreated
+         */
+        priv.rowsChanged = function(splices) {
+
+            $.each(splices, function(index, splice) {
+
+                var from = splice.index;
+                var to = splice.index + splice.addedCount;
+
+                //get the new rows, add them to lookup and make them observable
+                $.each(_data.meta.rowsAll.slice(from, to), function (index, row) {
+                    _data.meta.rowsLookup[row[_uniqueCol]] = {
+                        index: from + index,
+                        row: row
+                    };
+                    if (row["row-checked"] === true)
+                        _data.meta.rowsChecked[row[_uniqueCol]] = row;
+                    else
+                        delete _data.meta.rowsChecked[row[_uniqueCol]];
+                    priv.addRowObserver(row);
+                });
+                //remove old references
+                $.each(splice.removed, function(index, row) {
+                    delete _data.meta.rowObservers[row[_uniqueCol]];
+                    delete _data.meta.rowsLookup[row[_uniqueCol]];
+                });
+            });
+
+            _body = undefined;
+            _foot = undefined;
+            priv.filter();
+            priv.sort();
+            priv.createTable();
+        };
+
+        /*
+         when: row object is modified
+         what: recreates cell(if rendered) or table(if column is sorted/filtered on)
+         */
+        priv.rowChanged = function(row, added, removed, changed, getOldValueFn) {
+            var rowRendered = _data.meta.rowsRendered[row[_uniqueCol]];
+            var createTable = false;
+
+            var render = function(property) {
+                var col = _data.cols[property];
+
+                if (property == 'row-checked') {
+                    if (row["row-checked"] === true)
+                        _data.meta.rowsChecked[row[_uniqueCol]] = row;
+                    else
+                        delete _data.meta.rowsChecked[row[_uniqueCol]];
+                    //re-render table if sorting/filtering on checked state
+                    if (col && _filterCols[col.column] || _data.cols[_currSortCol] == col)
+                        createTable = true;
+                    //otherwise, re-render the checkbox
+                    else if (rowRendered)
+                        $('input.unique', rowRendered.closest('tr')).prop('checked', row["row-checked"] === true);
+                    return;
+                }
+                // re-render checkbox if checkable state changed
+                if (property == 'row-checkable' && rowRendered) {
+                    $('input.unique', rowRendered.closest('tr')).prop('disabled', row["row-checkable"] === false);
+                    return;
+                }
+                // when row-class, find cell not sorted/filtered on, and fall though to trigger a cell update
+                if (property == 'row-class' && rowRendered) {
+                    $.each(_data.cols, function (column, props) {
+                        if (_filterCols[props.column] || _data.cols[_currSortCol] == props)
+                            return;
+                        col = props;
+                        return false;
+                    });
+                }
+
+                if (col) {
+                    //re-render table if filtering/sorting on this column
+                    if (_filterCols[col.column] || _data.cols[_currSortCol] == col) {
+                        createTable = true;
+                        return;
+                    }
+                    //re-render cell if cell is rendered.
+                    if (rowRendered) {
+                        var start = new priv.ext.XDate();
+                        var cell = $('.watable-col-{0}'.f(col.column), rowRendered);
+                        priv.renderCell(cell, col.column, row, rowRendered);
+                        priv.log('row({0}).{1} changed value from:{2} to:{3} in {4}ms'.f(row[_uniqueCol], col.column, getOldValueFn(col.column), changed[col.column], new priv.ext.XDate() - start));
+                    }
+                }
+            };
+
+            $.each(Object.keys(changed), function(index, property) {
+                if (createTable) return false;
+                render(property);
+            });
+            $.each(Object.keys(added), function(index, property) {
+                if (createTable) return false;
+                render(property);
+            });
+            $.each(Object.keys(removed), function(index, property) {
+                if (createTable) return false;
+                render(property);
+            });
+
+            if (createTable) {
+                _body = undefined;
+                priv.filter();
+                priv.sort();
+                priv.createTable();
+            }
+        };
+
 
         /* Public API
          *************************************************************************/
@@ -1337,33 +1573,14 @@
             return publ;
         };
 
-        publ.getData = function (checked, filtered) {
+        publ.getRow = function(unique) {
+            priv.log('publ.getRow called');
+            return _data.meta.rowsLookup[unique];
+        }
+
+        publ.getData = function (checked, filtered, rendered) {
             priv.log('publ.getData called');
-            checked = checked || false;
-            filtered = filtered || false;
-
-            var data = $.extend(true, {}, _data);
-            delete data.cols["unique"];
-
-            $.each(data.cols, function(col) {
-                if (_filterCols[col]) data.cols[col].filter = _filterCols[col].filter;
-            });
-
-            if (!filtered) {
-                delete data.rows;
-                data.rows = data.rowsOrg;
-            }
-            delete data.rowsOrg;
-            delete data.fromRow;
-            delete data.toRow;
-
-            if (checked) {
-                delete data.rows;
-                data.rows = $.map(_uniqueCols, function (val, index) {
-                    return val;
-                });
-            }
-            return data;
+            return priv.getData(checked, filtered, rendered);
         };
 
         publ.setData = function (data, skipCols, resetChecked) {
@@ -1401,12 +1618,13 @@
         return s;
     };
 
-    //IE Polyfills
+    //Polyfills
     /* placeholders.js */ (function(t){"use strict";function e(t,e,r){return t.addEventListener?t.addEventListener(e,r,!1):t.attachEvent?t.attachEvent("on"+e,r):void 0}function r(t,e){var r,n;for(r=0,n=t.length;n>r;r++)if(t[r]===e)return!0;return!1}function n(t,e){var r;t.createTextRange?(r=t.createTextRange(),r.move("character",e),r.select()):t.selectionStart&&(t.focus(),t.setSelectionRange(e,e))}function a(t,e){try{return t.type=e,!0}catch(r){return!1}}t.Placeholders={Utils:{addEventListener:e,inArray:r,moveCaret:n,changeType:a}}})(this),function(t){"use strict";function e(t){var e;return t.value===t.getAttribute(S)&&"true"===t.getAttribute(I)?(t.setAttribute(I,"false"),t.value="",t.className=t.className.replace(R,""),e=t.getAttribute(P),e&&(t.type=e),!0):!1}function r(t){var e,r=t.getAttribute(S);return""===t.value&&r?(t.setAttribute(I,"true"),t.value=r,t.className+=" "+k,e=t.getAttribute(P),e?t.type="text":"password"===t.type&&H.changeType(t,"text")&&t.setAttribute(P,"password"),!0):!1}function n(t,e){var r,n,a,u,i;if(t&&t.getAttribute(S))e(t);else for(r=t?t.getElementsByTagName("input"):v,n=t?t.getElementsByTagName("textarea"):b,i=0,u=r.length+n.length;u>i;i++)a=r.length>i?r[i]:n[i-r.length],e(a)}function a(t){n(t,e)}function u(t){n(t,r)}function i(t){return function(){f&&t.value===t.getAttribute(S)&&"true"===t.getAttribute(I)?H.moveCaret(t,0):e(t)}}function l(t){return function(){r(t)}}function c(t){return function(e){return p=t.value,"true"===t.getAttribute(I)?!(p===t.getAttribute(S)&&H.inArray(C,e.keyCode)):void 0}}function o(t){return function(){var e;"true"===t.getAttribute(I)&&t.value!==p&&(t.className=t.className.replace(R,""),t.value=t.value.replace(t.getAttribute(S),""),t.setAttribute(I,!1),e=t.getAttribute(P),e&&(t.type=e)),""===t.value&&(t.blur(),H.moveCaret(t,0))}}function s(t){return function(){t===document.activeElement&&t.value===t.getAttribute(S)&&"true"===t.getAttribute(I)&&H.moveCaret(t,0)}}function d(t){return function(){a(t)}}function g(t){t.form&&(x=t.form,x.getAttribute(U)||(H.addEventListener(x,"submit",d(x)),x.setAttribute(U,"true"))),H.addEventListener(t,"focus",i(t)),H.addEventListener(t,"blur",l(t)),f&&(H.addEventListener(t,"keydown",c(t)),H.addEventListener(t,"keyup",o(t)),H.addEventListener(t,"click",s(t))),t.setAttribute(j,"true"),t.setAttribute(S,y),r(t)}var v,b,f,h,p,m,A,y,E,x,T,N,L,w=["text","search","url","tel","email","password","number","textarea"],C=[27,33,34,35,36,37,38,39,40,8,46],B="#ccc",k="placeholdersjs",R=RegExp("\\b"+k+"\\b"),S="data-placeholder-value",I="data-placeholder-active",P="data-placeholder-type",U="data-placeholder-submit",j="data-placeholder-bound",V="data-placeholder-focus",q="data-placeholder-live",z=document.createElement("input"),D=document.getElementsByTagName("head")[0],F=document.documentElement,G=t.Placeholders,H=G.Utils;if(void 0===z.placeholder){for(v=document.getElementsByTagName("input"),b=document.getElementsByTagName("textarea"),f="false"===F.getAttribute(V),h="false"!==F.getAttribute(q),m=document.createElement("style"),m.type="text/css",A=document.createTextNode("."+k+" { color:"+B+"; }"),m.styleSheet?m.styleSheet.cssText=A.nodeValue:m.appendChild(A),D.insertBefore(m,D.firstChild),L=0,N=v.length+b.length;N>L;L++)T=v.length>L?v[L]:b[L-v.length],y=T.getAttribute("placeholder"),y&&H.inArray(w,T.type)&&g(T);E=setInterval(function(){for(L=0,N=v.length+b.length;N>L;L++)T=v.length>L?v[L]:b[L-v.length],y=T.getAttribute("placeholder"),y&&H.inArray(w,T.type)&&(T.getAttribute(j)||g(T),(y!==T.getAttribute(S)||"password"===T.type&&!T.getAttribute(P))&&("password"===T.type&&!T.getAttribute(P)&&H.changeType(T,"text")&&T.setAttribute(P,"password"),T.value===T.getAttribute(S)&&(T.value=y),T.setAttribute(S,y)));h||clearInterval(E)},100)}G.disable=a,G.enable=u}(this);
     /* json3 */ (function(){var e=null;(function(t){function r(t){if(r[t]!==u)return r[t];var s;if("bug-string-char-index"==t)s="a"!="a"[0];else if("json"==t)s=r("json-stringify")&&r("json-parse");else{var o;if("json-stringify"==t){s=l.stringify;var a="function"==typeof s&&c;if(a){(o=function(){return 1}).toJSON=o;try{a="0"===s(0)&&"0"===s(new Number)&&'""'==s(new String)&&s(i)===u&&s(u)===u&&s()===u&&"1"===s(o)&&"[1]"==s([o])&&"[null]"==s([u])&&"null"==s(e)&&"[null,null,null]"==s([u,i,e])&&'{"a":[1,true,false,null,"\\u0000\\b\\n\\f\\r\\t"]}'==s({a:[o,!0,!1,e,"\0\b\n\f\r	"]})&&"1"===s(e,o)&&"[\n 1,\n 2\n]"==s([1,2],e,1)&&'"-271821-04-20T00:00:00.000Z"'==s(new Date(-864e13))&&'"+275760-09-13T00:00:00.000Z"'==s(new Date(864e13))&&'"-000001-01-01T00:00:00.000Z"'==s(new Date(-621987552e5))&&'"1969-12-31T23:59:59.999Z"'==s(new Date(-1))}catch(f){a=!1}}s=a}if("json-parse"==t){s=l.parse;if("function"==typeof s)try{if(0===s("0")&&!s(!1)){o=s('{"a":[1,true,false,null,"\\u0000\\b\\n\\f\\r\\t"]}');var h=5==o.a.length&&1===o.a[0];if(h){try{h=!s('"	"')}catch(p){}if(h)try{h=1!==s("01")}catch(d){}if(h)try{h=1!==s("1.")}catch(v){}}}}catch(m){h=!1}s=h}}return r[t]=!!s}var i={}.toString,s,o,u,a=typeof define==="function"&&define.amd,f="object"==typeof JSON&&JSON,l="object"==typeof exports&&exports&&!exports.nodeType&&exports;l&&f?(l.stringify=f.stringify,l.parse=f.parse):l=t.JSON=f||{};var c=new Date(-0xc782b5b800cec);try{c=-109252==c.getUTCFullYear()&&0===c.getUTCMonth()&&1===c.getUTCDate()&&10==c.getUTCHours()&&37==c.getUTCMinutes()&&6==c.getUTCSeconds()&&708==c.getUTCMilliseconds()}catch(h){}if(!r("json")){var p=r("bug-string-char-index");if(!c)var d=Math.floor,v=[0,31,59,90,120,151,181,212,243,273,304,334],m=function(e,t){return v[t]+365*(e-1970)+d((e-1969+(t=+(t>1)))/4)-d((e-1901+t)/100)+d((e-1601+t)/400)};if(!(s={}.hasOwnProperty))s=function(t){var r={},o;if((r.__proto__=e,r.__proto__={toString:1},r).toString!=i)s=function(t){var r=this.__proto__,t=t in(this.__proto__=e,this);this.__proto__=r;return t};else{o=r.constructor;s=function(e){var t=(this.constructor||o).prototype;return e in this&&!(e in t&&this[e]===t[e])}}r=e;return s.call(this,t)};var g={"boolean":1,number:1,string:1,"undefined":1};o=function(t,r){var u=0,a,f,l;(a=function(){this.valueOf=0}).prototype.valueOf=0;f=new a;for(l in f)s.call(f,l)&&u++;a=f=e;if(u)o=u==2?function(e,t){var n={},r=i.call(e)=="[object Function]",o;for(o in e)!(r&&o=="prototype")&&!s.call(n,o)&&(n[o]=1)&&s.call(e,o)&&t(o)}:function(e,t){var n=i.call(e)=="[object Function]",r,o;for(r in e)!(n&&r=="prototype")&&s.call(e,r)&&!(o=r==="constructor")&&t(r);(o||s.call(e,r="constructor"))&&t(r)};else{f=["valueOf","toString","toLocaleString","propertyIsEnumerable","isPrototypeOf","hasOwnProperty","constructor"];o=function(e,t){var n=i.call(e)=="[object Function]",r,o;if(o=!n)if(o=typeof e.constructor!="function"){o=typeof e.hasOwnProperty;o=o=="object"?!!e.hasOwnProperty:!g[o]}o=o?e.hasOwnProperty:s;for(r in e)!(n&&r=="prototype")&&o.call(e,r)&&t(r);for(n=f.length;r=f[--n];o.call(e,r)&&t(r));}}return o(t,r)};if(!r("json-stringify")){var y={92:"\\\\",34:'\\"',8:"\\b",12:"\\f",10:"\\n",13:"\\r",9:"\\t"},b=function(e,t){return("000000"+(t||0)).slice(-e)},w=function(e){var t='"',n=0,r=e.length,i=r>10&&p,s;for(i&&(s=e.split(""));n<r;n++){var o=e.charCodeAt(n);switch(o){case 8:case 9:case 10:case 12:case 13:case 34:case 92:t=t+y[o];break;default:if(o<32){t=t+("\\u00"+b(2,o.toString(16)));break}t=t+(i?s[n]:p?e.charAt(n):e[n])}}return t+'"'},E=function(t,r,a,f,l,c,h){var p,v,g,y,S,x,T,N,C;try{p=r[t]}catch(k){}if(typeof p=="object"&&p){v=i.call(p);if(v=="[object Date]"&&!s.call(p,"toJSON"))if(p>-1/0&&p<1/0){if(m){y=d(p/864e5);for(v=d(y/365.2425)+1970-1;m(v+1,0)<=y;v++);for(g=d((y-m(v,0))/30.42);m(v,g+1)<=y;g++);y=1+y-m(v,g);S=(p%864e5+864e5)%864e5;x=d(S/36e5)%24;T=d(S/6e4)%60;N=d(S/1e3)%60;S=S%1e3}else{v=p.getUTCFullYear();g=p.getUTCMonth();y=p.getUTCDate();x=p.getUTCHours();T=p.getUTCMinutes();N=p.getUTCSeconds();S=p.getUTCMilliseconds()}p=(v<=0||v>=1e4?(v<0?"-":"+")+b(6,v<0?-v:v):b(4,v))+"-"+b(2,g+1)+"-"+b(2,y)+"T"+b(2,x)+":"+b(2,T)+":"+b(2,N)+"."+b(3,S)+"Z"}else p=e;else if(typeof p.toJSON=="function"&&(v!="[object Number]"&&v!="[object String]"&&v!="[object Array]"||s.call(p,"toJSON")))p=p.toJSON(t)}a&&(p=a.call(r,t,p));if(p===e)return"null";v=i.call(p);if(v=="[object Boolean]")return""+p;if(v=="[object Number]")return p>-1/0&&p<1/0?""+p:"null";if(v=="[object String]")return w(""+p);if(typeof p=="object"){for(t=h.length;t--;)if(h[t]===p)throw TypeError();h.push(p);C=[];r=c;c=c+l;if(v=="[object Array]"){g=0;for(t=p.length;g<t;g++){v=E(g,p,a,f,l,c,h);C.push(v===u?"null":v)}t=C.length?l?"[\n"+c+C.join(",\n"+c)+"\n"+r+"]":"["+C.join(",")+"]":"[]"}else{o(f||p,function(e){var t=E(e,p,a,f,l,c,h);t!==u&&C.push(w(e)+":"+(l?" ":"")+t)});t=C.length?l?"{\n"+c+C.join(",\n"+c)+"\n"+r+"}":"{"+C.join(",")+"}":"{}"}h.pop();return t}};l.stringify=function(e,t,n){var r,s,o,u;if(typeof t=="function"||typeof t=="object"&&t)if((u=i.call(t))=="[object Function]")s=t;else if(u=="[object Array]"){o={};for(var a=0,f=t.length,l;a<f;l=t[a++],(u=i.call(l),u=="[object String]"||u=="[object Number]")&&(o[l]=1));}if(n)if((u=i.call(n))=="[object Number]"){if((n=n-n%1)>0){r="";for(n>10&&(n=10);r.length<n;r=r+" ");}}else u=="[object String]"&&(r=n.length<=10?n:n.slice(0,10));return E("",(l={},l[""]=e,l),s,o,r,"",[])}}if(!r("json-parse")){var S=String.fromCharCode,x={92:"\\",34:'"',47:"/",98:"\b",116:"	",110:"\n",102:"\f",114:"\r"},T,N,C=function(){T=N=e;throw SyntaxError()},k=function(){for(var t=N,r=t.length,i,s,o,u,a;T<r;){a=t.charCodeAt(T);switch(a){case 9:case 10:case 13:case 32:T++;break;case 123:case 125:case 91:case 93:case 58:case 44:i=p?t.charAt(T):t[T];T++;return i;case 34:i="@";for(T++;T<r;){a=t.charCodeAt(T);if(a<32)C();else if(a==92){a=t.charCodeAt(++T);switch(a){case 92:case 34:case 47:case 98:case 116:case 110:case 102:case 114:i=i+x[a];T++;break;case 117:s=++T;for(o=T+4;T<o;T++){a=t.charCodeAt(T);a>=48&&a<=57||a>=97&&a<=102||a>=65&&a<=70||C()}i=i+S("0x"+t.slice(s,T));break;default:C()}}else{if(a==34)break;a=t.charCodeAt(T);for(s=T;a>=32&&a!=92&&a!=34;)a=t.charCodeAt(++T);i=i+t.slice(s,T)}}if(t.charCodeAt(T)==34){T++;return i}C();default:s=T;if(a==45){u=true;a=t.charCodeAt(++T)}if(a>=48&&a<=57){for(a==48&&(a=t.charCodeAt(T+1),a>=48&&a<=57)&&C();T<r&&(a=t.charCodeAt(T),a>=48&&a<=57);T++);if(t.charCodeAt(T)==46){for(o=++T;o<r&&(a=t.charCodeAt(o),a>=48&&a<=57);o++);o==T&&C();T=o}a=t.charCodeAt(T);if(a==101||a==69){a=t.charCodeAt(++T);(a==43||a==45)&&T++;for(o=T;o<r&&(a=t.charCodeAt(o),a>=48&&a<=57);o++);o==T&&C();T=o}return+t.slice(s,T)}u&&C();if(t.slice(T,T+4)=="true"){T=T+4;return true}if(t.slice(T,T+5)=="false"){T=T+5;return false}if(t.slice(T,T+4)=="null"){T=T+4;return e}C()}}return"$"},L=function(e){var t,n;e=="$"&&C();if(typeof e=="string"){if((p?e.charAt(0):e[0])=="@")return e.slice(1);if(e=="["){for(t=[];;n||(n=true)){e=k();if(e=="]")break;if(n)if(e==","){e=k();e=="]"&&C()}else C();e==","&&C();t.push(L(e))}return t}if(e=="{"){for(t={};;n||(n=true)){e=k();if(e=="}")break;if(n)if(e==","){e=k();e=="}"&&C()}else C();(e==","||typeof e!="string"||(p?e.charAt(0):e[0])!="@"||k()!=":")&&C();t[e.slice(1)]=L(k())}return t}C()}return e},A=function(e,t,n){n=O(e,t,n);n===u?delete e[t]:e[t]=n},O=function(e,t,n){var r=e[t],s;if(typeof r=="object"&&r)if(i.call(r)=="[object Array]")for(s=r.length;s--;)A(r,s,n);else o(r,function(e){A(r,e,n)});return n.call(e,t,r)};l.parse=function(t,r){var s,o;T=0;N=""+t;s=L(k());k()!="$"&&C();T=N=e;return r&&i.call(r)=="[object Function]"?O((o={},o[""]=s,o),"",r):s}}}a&&define(function(){return l})})(this)})();
     Object.keys = Object.keys || function(o) { var result = []; for(var name in o) {  if (o.hasOwnProperty(name)) result.push(name); } return result; };
     String.prototype.trim = String.prototype.trim || function () { return this.replace(/^\s+|\s+$/g,''); };
     Date.now = Date.now || function() { return +new Date; };
     console = window.console || { log:function(){}, warn:function(){} };
+    /* polymer observe-js, Copyright (c) 2014 The Polymer Authors. All rights reserved. */ (function(e){"use strict";function n(){function t(t){e=t}if(typeof Object.observe!=="function"||typeof Array.observe!=="function"){return false}var e=[];var n={};var r=[];Object.observe(n,t);Array.observe(r,t);n.id=1;n.id=2;delete n.id;r.push(1,2);r.length=0;Object.deliverChangeRecords(t);if(e.length!==5)return false;if(e[0].type!="add"||e[1].type!="update"||e[2].type!="delete"||e[3].type!="splice"||e[4].type!="splice"){return false}Object.unobserve(n,t);Array.unobserve(r,t);return true}function i(){if(typeof chrome!=="undefined"&&chrome.app&&chrome.app.runtime){return false}if(typeof navigator!="undefined"&&navigator.getDeviceStorage){return false}try{var e=new Function("","return true;");return e()}catch(t){return false}}function o(e){return+e===e>>>0&&e!==""}function u(e){return+e}function a(e){return e===Object(e)}function l(e,t){if(e===t)return e!==0||1/e===1/t;if(f(e)&&f(t))return true;return e!==e&&t!==t}function v(e){if(e===undefined)return"eof";var t=e.charCodeAt(0);switch(t){case 91:case 93:case 46:case 34:case 39:case 48:return e;case 95:case 36:return"ident";case 32:case 9:case 10:case 13:case 160:case 65279:case 8232:case 8233:return"ws"}if(97<=t&&t<=122||65<=t&&t<=90)return"ident";if(49<=t&&t<=57)return"number";return"else"}function g(){}function y(e){function h(){if(n>=e.length)return;var t=e[n+1];if(l=="inSingleQuote"&&t=="'"||l=="inDoubleQuote"&&t=='"'){n++;i=t;c.append();return true}}var t=[];var n=-1;var r,i,s,o,u,a,f,l="beforePath";var c={push:function(){if(s===undefined)return;t.push(s);s=undefined},append:function(){if(s===undefined)s=i;else s+=i}};while(l){n++;r=e[n];if(r=="\\"&&h(l))continue;o=v(r);f=m[l];u=f[o]||f["else"]||"error";if(u=="error")return;l=u[0];a=c[u[1]]||g;i=u[2]===undefined?r:u[2];a();if(l==="afterPath"){return t}}return}function b(e){return d.test(e)}function E(e,t){if(t!==w)throw Error("Use Path.get to retrieve path objects");for(var n=0;n<e.length;n++){this.push(String(e[n]))}if(s&&this.length){this.getValueFrom=this.compiledGetValueFromFn()}}function x(e){if(e instanceof E)return e;if(e==null||e.length==0)e="";if(typeof e!="string"){if(o(e.length)){return new E(e,w)}e=String(e)}var t=S[e];if(t)return t;var n=y(e);if(!n)return N;var t=new E(n,w);S[e]=t;return t}function T(e){if(o(e)){return"["+e+"]"}else{return'["'+e.replace(/"/g,'\\"')+'"]'}}function k(n){var r=0;while(r<C&&n.check_()){r++}if(t)e.dirtyCheckCycleCount=r;return r>0}function L(e){for(var t in e)return false;return true}function A(e){return L(e.added)&&L(e.removed)&&L(e.changed)}function O(e,t){var n={};var r={};var i={};for(var s in t){var o=e[s];if(o!==undefined&&o===t[s])continue;if(!(s in e)){r[s]=undefined;continue}if(o!==t[s])i[s]=o}for(var s in e){if(s in t)continue;n[s]=e[s]}if(Array.isArray(e)&&e.length!==t.length)i.length=e.length;return{added:n,removed:r,changed:i}}function _(){if(!M.length)return false;for(var e=0;e<M.length;e++){M[e]()}M.length=0;return true}function H(){function i(t){if(e&&e.state_===U&&!n)e.check_(t)}var e;var t;var n=false;var r=true;return{open:function(t){if(e)throw Error("ObservedObject in use");if(!r)Object.deliverChangeRecords(i);e=t;r=false},observe:function(e,n){t=e;if(n)Array.observe(t,i);else Object.observe(t,i)},deliver:function(e){n=e;Object.deliverChangeRecords(i);n=false},close:function(){e=undefined;Object.unobserve(t,i);P.push(this)}}}function B(e,t,n){var r=P.pop()||H();r.open(e);r.observe(t,n);return r}function F(){function s(e,t){if(!e)return;if(e===r)i[t]=true;if(n.indexOf(e)<0){n.push(e);Object.observe(e,u)}s(Object.getPrototypeOf(e),t)}function o(e){for(var t=0;t<e.length;t++){var n=e[t];if(n.object!==r||i[n.name]||n.type==="setPrototype"){return false}}return true}function u(e){if(o(e))return;var n;for(var r=0;r<t.length;r++){n=t[r];if(n.state_==U){n.iterateObjects_(s)}}for(var r=0;r<t.length;r++){n=t[r];if(n.state_==U){n.check_()}}}var e=0;var t=[];var n=[];var r;var i;var a={objects:n,get rootObject(){return r},set rootObject(e){r=e;i={}},open:function(n,r){t.push(n);e++;n.iterateObjects_(s)},close:function(s){e--;if(e>0){return}for(var o=0;o<n.length;o++){Object.unobserve(n[o],u);V.unobservedCount++}t.length=0;n.length=0;r=undefined;i=undefined;j.push(this);if(I===this)I=null}};return a}function q(e,t){if(!I||I.rootObject!==t){I=j.pop()||F();I.rootObject=t}I.open(e,t);return I}function V(){this.state_=R;this.callback_=undefined;this.target_=undefined;this.directObserver_=undefined;this.value_=undefined;this.id_=X++}function K(e){V._allObserversCount++;if(!$)return;J.push(e)}function Q(e){V._allObserversCount--}function Y(e){V.call(this);this.value_=e;this.oldObject_=undefined}function Z(e){if(!Array.isArray(e))throw Error("Provided object is not an Array");Y.call(this,e)}function et(e,t){V.call(this);this.object_=e;this.path_=x(t);this.directObserver_=undefined}function tt(e){V.call(this);this.reportChangesOnOpen_=e;this.value_=[];this.directObserver_=undefined;this.observed_=[]}function rt(e){return e}function it(e,t,n,r){this.callback_=undefined;this.target_=undefined;this.value_=undefined;this.observable_=e;this.getValueFn_=t||rt;this.setValueFn_=n||rt;this.dontPassThroughSet_=r}function ot(e,t,n){var r={};var i={};for(var s=0;s<t.length;s++){var o=t[s];if(!st[o.type]){console.error("Unknown changeRecord type: "+o.type);console.error(o);continue}if(!(o.name in n))n[o.name]=o.oldValue;if(o.type=="update")continue;if(o.type=="add"){if(o.name in i)delete i[o.name];else r[o.name]=true;continue}if(o.name in r){delete r[o.name];delete n[o.name]}else{i[o.name]=true}}for(var u in r)r[u]=e[u];for(var u in i)i[u]=undefined;var a={};for(var u in n){if(u in r||u in i)continue;var f=e[u];if(n[u]!==f)a[u]=f}return{added:r,removed:i,changed:a}}function ut(e,t,n){return{index:e,removed:t,addedCount:n}}function ht(){}function dt(e,t,n,r,i,s){return pt.calcSplices(e,t,n,r,i,s)}function vt(e,t,n,r){if(t<n||r<e)return-1;if(t==n||r==e)return 0;if(e<n){if(t<r)return t-n;else return r-n}else{if(r<t)return r-e;else return t-e}}function mt(e,t,n,r){var i=ut(t,n,r);var s=false;var o=0;for(var u=0;u<e.length;u++){var a=e[u];a.index+=o;if(s)continue;var f=vt(i.index,i.index+i.removed.length,a.index,a.index+a.addedCount);if(f>=0){e.splice(u,1);u--;o-=a.addedCount-a.removed.length;i.addedCount+=a.addedCount-f;var l=i.removed.length+a.removed.length-f;if(!i.addedCount&&!l){s=true}else{var n=a.removed;if(i.index<a.index){var c=i.removed.slice(0,a.index-i.index);Array.prototype.push.apply(c,n);n=c}if(i.index+i.removed.length>a.index+a.addedCount){var h=i.removed.slice(a.index+a.addedCount-i.index);Array.prototype.push.apply(n,h)}i.removed=n;if(a.index<i.index){i.index=a.index}}}else if(i.index<a.index){s=true;e.splice(u,0,i);u++;var p=i.addedCount-i.removed.length;a.index+=p;o+=p}}if(!s)e.push(i)}function gt(e,t){var n=[];for(var r=0;r<t.length;r++){var i=t[r];switch(i.type){case"splice":mt(n,i.index,i.removed.slice(),i.addedCount);break;case"add":case"update":case"delete":if(!o(i.name))continue;var s=u(i.name);if(s<0)continue;mt(n,s,[i.oldValue],1);break;default:console.error("Unexpected record type: "+JSON.stringify(i));break}}return n}function yt(e,t){var n=[];gt(e,t).forEach(function(t){if(t.addedCount==1&&t.removed.length==1){if(t.removed[0]!==e[t.index])n.push(t);return}n=n.concat(dt(e,t.index,t.index+t.addedCount,t.removed,0,t.removed.length))});return n}var t=e.testingExposeCycleCount;var r=n();var s=i();var f=e.Number.isNaN||function(t){return typeof t==="number"&&e.isNaN(t)};var c="__proto__"in{}?function(e){return e}:function(e){var t=e.__proto__;if(!t)return e;var n=Object.create(t);Object.getOwnPropertyNames(e).forEach(function(t){Object.defineProperty(n,t,Object.getOwnPropertyDescriptor(e,t))});return n};var h="[$_a-zA-Z]";var p="[$_a-zA-Z0-9]";var d=new RegExp("^"+h+"+"+p+"*"+"$");var m={beforePath:{ws:["beforePath"],ident:["inIdent","append"],"[":["beforeElement"],eof:["afterPath"]},inPath:{ws:["inPath"],".":["beforeIdent"],"[":["beforeElement"],eof:["afterPath"]},beforeIdent:{ws:["beforeIdent"],ident:["inIdent","append"]},inIdent:{ident:["inIdent","append"],0:["inIdent","append"],number:["inIdent","append"],ws:["inPath","push"],".":["beforeIdent","push"],"[":["beforeElement","push"],eof:["afterPath","push"]},beforeElement:{ws:["beforeElement"],0:["afterZero","append"],number:["inIndex","append"],"'":["inSingleQuote","append",""],'"':["inDoubleQuote","append",""]},afterZero:{ws:["afterElement","push"],"]":["inPath","push"]},inIndex:{0:["inIndex","append"],number:["inIndex","append"],ws:["afterElement"],"]":["inPath","push"]},inSingleQuote:{"'":["afterElement"],eof:["error"],"else":["inSingleQuote","append"]},inDoubleQuote:{'"':["afterElement"],eof:["error"],"else":["inDoubleQuote","append"]},afterElement:{ws:["afterElement"],"]":["inPath","push"]}};var w={};var S={};E.get=x;E.prototype=c({__proto__:[],valid:true,toString:function(){var e="";for(var t=0;t<this.length;t++){var n=this[t];if(b(n)){e+=t?"."+n:n}else{e+=T(n)}}return e},getValueFrom:function(e,t){for(var n=0;n<this.length;n++){if(e==null)return;e=e[this[n]]}return e},iterateObjects:function(e,t){for(var n=0;n<this.length;n++){if(n)e=e[this[n-1]];if(!a(e))return;t(e,this[n])}},compiledGetValueFromFn:function(){var e="";var t="obj";e+="if (obj != null";var n=0;var r;for(;n<this.length-1;n++){r=this[n];t+=b(r)?"."+r:T(r);e+=" &&\n     "+t+" != null"}e+=")\n";var r=this[n];t+=b(r)?"."+r:T(r);e+="  return "+t+";\nelse\n  return undefined;";return new Function("obj",e)},setValueFrom:function(e,t){if(!this.length)return false;for(var n=0;n<this.length-1;n++){if(!a(e))return false;e=e[this[n]]}if(!a(e))return false;e[this[n]]=t;return true}});var N=new E("",w);N.valid=false;N.getValueFrom=N.setValueFrom=function(){};var C=1e3;var M=[];var D=r?function(){return function(e){return Promise.resolve().then(e)}}():function(){return function(e){M.push(e)}}();var P=[];var j=[];var I;var R=0;var U=1;var z=2;var W=3;var X=1;V.prototype={open:function(e,t){if(this.state_!=R)throw Error("Observer has already been opened.");K(this);this.callback_=e;this.target_=t;this.connect_();this.state_=U;return this.value_},close:function(){if(this.state_!=U)return;Q(this);this.disconnect_();this.value_=undefined;this.callback_=undefined;this.target_=undefined;this.state_=z},deliver:function(){if(this.state_!=U)return;k(this)},report_:function(e){try{this.callback_.apply(this.target_,e)}catch(t){V._errorThrownDuringCallback=true;console.error("Exception caught during observer callback: "+(t.stack||t))}},discardChanges:function(){this.check_(undefined,true);return this.value_}};var $=!r;var J;V._allObserversCount=0;if($){J=[]}var G=false;e.Platform=e.Platform||{};e.Platform.performMicrotaskCheckpoint=function(){if(G)return;if(!$)return;G=true;var n=0;var r,i;do{n++;i=J;J=[];r=false;for(var s=0;s<i.length;s++){var o=i[s];if(o.state_!=U)continue;if(o.check_())r=true;J.push(o)}if(_())r=true}while(n<C&&r);if(t)e.dirtyCheckCycleCount=n;G=false};if($){e.Platform.clearObservers=function(){J=[]}}Y.prototype=c({__proto__:V.prototype,arrayObserve:false,connect_:function(e,t){if(r){this.directObserver_=B(this,this.value_,this.arrayObserve)}else{this.oldObject_=this.copyObject(this.value_)}},copyObject:function(e){var t=Array.isArray(e)?[]:{};for(var n in e){t[n]=e[n]}if(Array.isArray(e))t.length=e.length;return t},check_:function(e,t){var n;var i;if(r){if(!e)return false;i={};n=ot(this.value_,e,i)}else{i=this.oldObject_;n=O(this.value_,this.oldObject_)}if(A(n))return false;if(!r)this.oldObject_=this.copyObject(this.value_);this.report_([n.added||{},n.removed||{},n.changed||{},function(e){return i[e]}]);return true},disconnect_:function(){if(r){this.directObserver_.close();this.directObserver_=undefined}else{this.oldObject_=undefined}},deliver:function(){if(this.state_!=U)return;if(r)this.directObserver_.deliver(false);else k(this)},discardChanges:function(){if(this.directObserver_)this.directObserver_.deliver(true);else this.oldObject_=this.copyObject(this.value_);return this.value_}});Z.prototype=c({__proto__:Y.prototype,arrayObserve:true,copyObject:function(e){return e.slice()},check_:function(e){var t;if(r){if(!e)return false;t=yt(this.value_,e)}else{t=dt(this.value_,0,this.value_.length,this.oldObject_,0,this.oldObject_.length)}if(!t||!t.length)return false;if(!r)this.oldObject_=this.copyObject(this.value_);this.report_([t]);return true}});Z.applySplices=function(e,t,n){n.forEach(function(n){var r=[n.index,n.removed.length];var i=n.index;while(i<n.index+n.addedCount){r.push(t[i]);i++}Array.prototype.splice.apply(e,r)})};et.prototype=c({__proto__:V.prototype,get path(){return this.path_},connect_:function(){if(r)this.directObserver_=q(this,this.object_);this.check_(undefined,true)},disconnect_:function(){this.value_=undefined;if(this.directObserver_){this.directObserver_.close(this);this.directObserver_=undefined}},iterateObjects_:function(e){this.path_.iterateObjects(this.object_,e)},check_:function(e,t){var n=this.value_;this.value_=this.path_.getValueFrom(this.object_);if(t||l(this.value_,n))return false;this.report_([this.value_,n,this]);return true},setValue:function(e){if(this.path_)this.path_.setValueFrom(this.object_,e)}});var nt={};tt.prototype=c({__proto__:V.prototype,connect_:function(){if(r){var e;var t=false;for(var n=0;n<this.observed_.length;n+=2){e=this.observed_[n];if(e!==nt){t=true;break}}if(t)this.directObserver_=q(this,e)}this.check_(undefined,!this.reportChangesOnOpen_)},disconnect_:function(){for(var e=0;e<this.observed_.length;e+=2){if(this.observed_[e]===nt)this.observed_[e+1].close()}this.observed_.length=0;this.value_.length=0;if(this.directObserver_){this.directObserver_.close(this);this.directObserver_=undefined}},addPath:function(e,t){if(this.state_!=R&&this.state_!=W)throw Error("Cannot add paths once started.");var t=x(t);this.observed_.push(e,t);if(!this.reportChangesOnOpen_)return;var n=this.observed_.length/2-1;this.value_[n]=t.getValueFrom(e)},addObserver:function(e){if(this.state_!=R&&this.state_!=W)throw Error("Cannot add observers once started.");this.observed_.push(nt,e);if(!this.reportChangesOnOpen_)return;var t=this.observed_.length/2-1;this.value_[t]=e.open(this.deliver,this)},startReset:function(){if(this.state_!=U)throw Error("Can only reset while open");this.state_=W;this.disconnect_()},finishReset:function(){if(this.state_!=W)throw Error("Can only finishReset after startReset");this.state_=U;this.connect_();return this.value_},iterateObjects_:function(e){var t;for(var n=0;n<this.observed_.length;n+=2){t=this.observed_[n];if(t!==nt)this.observed_[n+1].iterateObjects(t,e)}},check_:function(e,t){var n;for(var r=0;r<this.observed_.length;r+=2){var i=this.observed_[r];var s=this.observed_[r+1];var o;if(i===nt){var u=s;o=this.state_===R?u.open(this.deliver,this):u.discardChanges()}else{o=s.getValueFrom(i)}if(t){this.value_[r/2]=o;continue}if(l(o,this.value_[r/2]))continue;n=n||[];n[r/2]=this.value_[r/2];this.value_[r/2]=o}if(!n)return false;this.report_([this.value_,n,this.observed_]);return true}});it.prototype={open:function(e,t){this.callback_=e;this.target_=t;this.value_=this.getValueFn_(this.observable_.open(this.observedCallback_,this));return this.value_},observedCallback_:function(e){e=this.getValueFn_(e);if(l(e,this.value_))return;var t=this.value_;this.value_=e;this.callback_.call(this.target_,this.value_,t)},discardChanges:function(){this.value_=this.getValueFn_(this.observable_.discardChanges());return this.value_},deliver:function(){return this.observable_.deliver()},setValue:function(e){e=this.setValueFn_(e);if(!this.dontPassThroughSet_&&this.observable_.setValue)return this.observable_.setValue(e)},close:function(){if(this.observable_)this.observable_.close();this.callback_=undefined;this.target_=undefined;this.observable_=undefined;this.value_=undefined;this.getValueFn_=undefined;this.setValueFn_=undefined}};var st={add:true,update:true,"delete":true};var at=0;var ft=1;var lt=2;var ct=3;ht.prototype={calcEditDistances:function(e,t,n,r,i,s){var o=s-i+1;var u=n-t+1;var a=new Array(o);for(var f=0;f<o;f++){a[f]=new Array(u);a[f][0]=f}for(var l=0;l<u;l++)a[0][l]=l;for(var f=1;f<o;f++){for(var l=1;l<u;l++){if(this.equals(e[t+l-1],r[i+f-1]))a[f][l]=a[f-1][l-1];else{var c=a[f-1][l]+1;var h=a[f][l-1]+1;a[f][l]=c<h?c:h}}}return a},spliceOperationsFromEditDistances:function(e){var t=e.length-1;var n=e[0].length-1;var r=e[t][n];var i=[];while(t>0||n>0){if(t==0){i.push(lt);n--;continue}if(n==0){i.push(ct);t--;continue}var s=e[t-1][n-1];var o=e[t-1][n];var u=e[t][n-1];var a;if(o<u)a=o<s?o:s;else a=u<s?u:s;if(a==s){if(s==r){i.push(at)}else{i.push(ft);r=s}t--;n--}else if(a==o){i.push(ct);t--;r=o}else{i.push(lt);n--;r=u}}i.reverse();return i},calcSplices:function(e,t,n,r,i,s){var o=0;var u=0;var a=Math.min(n-t,s-i);if(t==0&&i==0)o=this.sharedPrefix(e,r,a);if(n==e.length&&s==r.length)u=this.sharedSuffix(e,r,a-o);t+=o;i+=o;n-=u;s-=u;if(n-t==0&&s-i==0)return[];if(t==n){var f=ut(t,[],0);while(i<s)f.removed.push(r[i++]);return[f]}else if(i==s)return[ut(t,[],n-t)];var l=this.spliceOperationsFromEditDistances(this.calcEditDistances(e,t,n,r,i,s));var f=undefined;var c=[];var h=t;var p=i;for(var d=0;d<l.length;d++){switch(l[d]){case at:if(f){c.push(f);f=undefined}h++;p++;break;case ft:if(!f)f=ut(h,[],0);f.addedCount++;h++;f.removed.push(r[p]);p++;break;case lt:if(!f)f=ut(h,[],0);f.addedCount++;h++;break;case ct:if(!f)f=ut(h,[],0);f.removed.push(r[p]);p++;break}}if(f){c.push(f)}return c},sharedPrefix:function(e,t,n){for(var r=0;r<n;r++)if(!this.equals(e[r],t[r]))return r;return n},sharedSuffix:function(e,t,n){var r=e.length;var i=t.length;var s=0;while(s<n&&this.equals(e[--r],t[--i]))s++;return s},calculateSplices:function(e,t){return this.calcSplices(e,0,e.length,t,0,t.length)},equals:function(e,t){return e===t}};var pt=new ht;var bt=e;if(typeof exports!=="undefined"){if(typeof module!=="undefined"&&module.exports){bt=exports=module.exports}bt=exports}bt.Observer=V;bt.Observer.runEOM_=D;bt.Observer.observerSentinel_=nt;bt.Observer.hasObjectObserve=r;bt.ArrayObserver=Z;bt.ArrayObserver.calculateSplices=function(e,t){return pt.calculateSplices(e,t)};bt.ArraySplice=ht;bt.ObjectObserver=Y;bt.PathObserver=et;bt.CompoundObserver=tt;bt.Path=E;bt.ObserverTransform=it})(typeof global!=="undefined"&&global&&typeof module!=="undefined"&&module?global:this||window);
 
 })(jQuery);
