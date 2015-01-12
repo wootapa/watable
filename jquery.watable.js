@@ -1,5 +1,5 @@
 /*
- WATable 1.10
+ WATable 1.10.1
  Copyright (c) 2012 Andreas Petersson(apesv03@gmail.com)
  http://wootapa-watable.appspot.com/
 
@@ -47,7 +47,7 @@
             preFill: false, //prefill table with empty rows
             sorting: true, // enable column sorting
             sortEmptyLast: true, //empty values will be shown last
-            dataBind: true, //updates table when detecting row data changes
+            dataBind: false, //updates table when detecting row data changes
             types: { //type specific options
                 string: {},
                 number: {},
@@ -87,6 +87,7 @@
         var _filterTimeout; //timer for delayed filtering
         var _uniqueCol; //reference to column with the unique property
         var _checkToggleChecked = false; //check-all toggle state
+        var _dataBind; //true if dataBind
 
         var _vendors = ["webkit", "moz", "Moz", "ms", "o", "O"]; //vendors prefixes. used for not yet officially supported features.
         var _transition = {
@@ -172,22 +173,31 @@
             //check support transitions
             _transition.supported = priv.supportsTransition();
 
-            //fill the table with empty cells
-            if (priv.options.preFill) {
-                var data = {
-                    cols: {
-                        dummy: {
-                            index: 1,
-                            friendly: "&nbsp;",
-                            type: "string"
-                        }
-                    },
-                    rows: []
-                };
-                for (var i = 0; i < priv.options.pageSize; i++)
-                    data.rows.push({dummy: "&nbsp;"});
-                priv.setData(data);
+            //check supports dataBinding
+            _dataBind = (priv.options.dataBind && !!document.addEventListener);
+            
+            if (priv.options.data) {
+                priv.setData(priv.options.data);
             }
+            else {
+                //fill the table with empty cells
+                if (priv.options.preFill) {
+                    var data = {
+                        cols: {
+                            dummy: {
+                                index: 1,
+                                friendly: "&nbsp;",
+                                type: "string"
+                            }
+                        },
+                        rows: []
+                    };
+                    for (var i = 0; i < priv.options.pageSize; i++)
+                        data.rows.push({dummy: "&nbsp;"});
+                    priv.setData(data);
+                }
+            }
+            
             //try call webservice for data
             priv.update();
         };
@@ -433,17 +443,17 @@
                 $.each(_data.rows.slice(_data.meta.fromRow, _data.meta.toRow), function (index, row) {
 
                     var rowRendered = $('<tr class="{0}"></tr>'.f(index%2 == 0 ? 'odd' : 'even')).appendTo(_body);
-
+                    
                     if (_uniqueCol) {
                         _data.meta.rowsRendered[row[_uniqueCol]] = rowRendered;
-                    }
-
-                    //create checkbox
-                    if (_uniqueCol && priv.options.checkboxes) {
-                        var check = _data.meta.rowsChecked[row[_uniqueCol]] != undefined ? 'checked' : '';
-                        var checkable = row['row-checkable'] === false ? 'disabled' : '';
-                        var cell = $('<td></td>').appendTo(rowRendered);
-                        $('<input class="unique" {0} {1} type="checkbox" />'.f(check, checkable)).appendTo(cell);
+                        
+                        //create checkbox
+                        if (priv.options.checkboxes) {
+                            var check = _data.meta.rowsChecked[row[_uniqueCol]] != undefined ? 'checked' : '';
+                            var checkable = row['row-checkable'] === false ? 'disabled' : '';
+                            var cell = $('<td></td>').appendTo(rowRendered);
+                            $('<input class="unique" {0} {1} type="checkbox" />'.f(check, checkable)).appendTo(cell);
+                        }
                     }
 
                     //create cells
@@ -658,19 +668,17 @@
         priv.renderCell= function(cell, col, row, renderedRow) {
             cell.data('column', col);
 
-            //add any cell level classes
+            //add any cell/column level classes
             cell.removeClass();
-            var cellClasses = row[col + 'Class'];
-            if (cellClasses) {
-                $.each(cellClasses.split(','), function(i, cellClass) {
-                    cellClass = cellClass.trim();
-                    if (!cell.hasClass(cellClass))
-                        cell.addClass(cellClass);
-                });
-            }
+            var cellClasses = $.grep([].concat((row[col + 'Cls'] || '').split(','), (_data.cols[col].cls || '').split(',')),function(n){ return(n)});
+            $.each(cellClasses, function(i, cellClass) {
+                cellClass = cellClass.trim();
+                if (!cell.hasClass(cellClass))
+                    cell.addClass(cellClass);
+            });
 
             //add any row level classes here as well
-            var rowClasses = row['row-class'] || "";
+            var rowClasses = row['row-cls'] || "";
             var newClasses = $.grep(rowClasses.split(','),function(n){ return(n)});
             var oldClasses = renderedRow.attr('class').split(' ');
 
@@ -843,7 +851,7 @@
                     //add row observer
                     priv.addRowObserver(row);
                 });
-                 if (priv.options.dataBind) {
+                 if (_dataBind) {
                     _data.meta.rowsObserver = new ArrayObserver(_data.meta.rowsAll).open(priv.rowsChanged);
                  }
             }
@@ -1132,7 +1140,7 @@
          adds an observer to a row
          */
         priv.addRowObserver = function(row) {
-            if (priv.options.dataBind) {
+            if (_dataBind) {
                 _data.meta.rowObservers[row[_uniqueCol]] = new ObjectObserver(row).open(function(added, removed, changed, getOldValueFn) {
                     priv.rowChanged(row, added, removed, changed, getOldValueFn);
                 });
@@ -1389,12 +1397,14 @@
                 //check for new checked state
                 if (row['row-checkable'] !== false) {
                     var target = $(e.target);
+                    var checkbox;
 
                     if (target.hasClass('unique') && target.prop('checked') != callBackData.checked) {
+                        checkbox = $(target);
                         e.preventDefault();
                     }
                     if (callBackData.checked != isChecked) {
-                        var checkbox = $('.unique', elem.closest('tr'));
+                        checkbox = checkbox || $('.unique', elem.closest('tr'));
                         checkbox.prop('checked', callBackData.checked);
                         priv.rowChecked.call(checkbox, e);
                     }
@@ -1449,6 +1459,11 @@
         priv.rowsChanged = function(splices) {
 
             $.each(splices, function(index, splice) {
+                //remove old references
+                $.each(splice.removed, function(index, row) {
+                    delete _data.meta.rowObservers[row[_uniqueCol]];
+                    delete _data.meta.rowsLookup[row[_uniqueCol]];
+                });
 
                 var from = splice.index;
                 var to = splice.index + splice.addedCount;
@@ -1464,11 +1479,6 @@
                     else
                         delete _data.meta.rowsChecked[row[_uniqueCol]];
                     priv.addRowObserver(row);
-                });
-                //remove old references
-                $.each(splice.removed, function(index, row) {
-                    delete _data.meta.rowObservers[row[_uniqueCol]];
-                    delete _data.meta.rowsLookup[row[_uniqueCol]];
                 });
             });
 
@@ -1489,6 +1499,8 @@
 
             var render = function(property) {
                 var col = _data.cols[property];
+                if (!col) col = _data.cols[property.substring(0, property.indexOf('Format'))];
+                if (!col) col = _data.cols[property.substring(0, property.indexOf('Cls'))];
 
                 if (property == 'row-checked') {
                     if (row["row-checked"] === true)
@@ -1508,17 +1520,21 @@
                     $('input.unique', rowRendered.closest('tr')).prop('disabled', row["row-checkable"] === false);
                     return;
                 }
-                // when row-class, find cell not sorted/filtered on, and fall though to trigger a cell update
-                if (property == 'row-class' && rowRendered) {
+                // when row-class, find cell not unique/sorted/filtered on, and fall though to trigger a cell update
+                if (property == 'row-cls' && rowRendered) {
                     $.each(_data.cols, function (column, props) {
-                        if (_filterCols[props.column] || _data.cols[_currSortCol] == props)
+                        if (props.column == _uniqueCol || props.hidden || _filterCols[props.column] || _data.cols[_currSortCol] == props)
                             return;
                         col = props;
                         return false;
                     });
+                    if (!col) {
+                        createTable = true;
+                        return;
+                    }
                 }
 
-                if (col) {
+                if (col && !col.hidden === true) {
                     //re-render table if filtering/sorting on this column
                     if (_filterCols[col.column] || _data.cols[_currSortCol] == col) {
                         createTable = true;

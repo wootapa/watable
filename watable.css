@@ -114,6 +114,16 @@
   filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#00ffffff', endColorstr='#931600',GradientType=1 ); /* IE6-9 */
 }
 
+.watable .blue {
+  background: -moz-linear-gradient(left,  rgba(255,255,255,0) 0%, rgba(0,127,206,0.38) 38%, rgba(0,127,206,1) 100%) !important; /* FF3.6+ */
+  background: -webkit-gradient(linear, left top, right top, color-stop(0%,rgba(255,255,255,0)), color-stop(38%,rgba(0,127,206,0.38)), color-stop(100%,rgba(0,127,206,1))) !important; /* Chrome,Safari4+ */
+  background: -webkit-linear-gradient(left,  rgba(255,255,255,0) 0%,rgba(0,127,206,0.38) 38%,rgba(0,127,206,1) 100%) !important; /* Chrome10+,Safari5.1+ */
+  background: -o-linear-gradient(left,  rgba(255,255,255,0) 0%,rgba(0,127,206,0.38) 38%,rgba(0,127,206,1) 100%) !important; /* Opera 11.10+ */
+  background: -ms-linear-gradient(left,  rgba(255,255,255,0) 0%,rgba(0,127,206,0.38) 38%,rgba(0,127,206,1) 100%) !important;/* IE10+ */
+  background: linear-gradient(to right,  rgba(255,255,255,0) 0%,rgba(0,127,206,0.38) 38%,rgba(0,127,206,1) 100%) !important; /* W3C */
+  filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#00ffffff', endColorstr='#007fce',GradientType=1 ) !important; /* IE6-9 */
+}
+
 .watable .gray {
   background-color: #d3d3d3 !important;
 }
