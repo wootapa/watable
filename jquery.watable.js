@@ -43,6 +43,7 @@
             pageSize: 10, //current pagesize
             pageSizePadding: false, //pad with empty rows
             pageSizes: [10, 20, 30, 40, 50, 'All'], //available pagesizes
+            noPager: true, //set true to disable pagination
             hidePagerOnEmpty: false, //removes pager if no rows
             preFill: false, //prefill table with empty rows
             sorting: true, // enable column sorting
@@ -568,25 +569,28 @@
 
                 var footToolbar = $('<div class="btn-toolbar"></div>').appendTo(footCell);
                 var footDiv = $('<div class="btn-group"></div>').appendTo(footToolbar);
+                
+                if (priv.options.noPager == false) {
                 var footPagerUl = $('<ul class="pagination"></ul>').appendTo(footDiv);
-
-                $('<li class="{0}"><a href="#">«</a></li>'.f(_currPage == 1 ? 'disabled' : ''))
-                    .on('click', {pageIndex: _currPage - 1}, priv.pageChanged).appendTo(footPagerUl);
-
-                for (var i = lowerPage; i <= upperPage; i++) {
-                    var link;
-                    if (i == _currPage) {
-                        link = $('<li class="active"><a href="#">{0}</a></li>'.f(i));
-                    }
-                    else {
-                        link = $('<li class="{1}"><a href="#">{0}</a></li>'.f(i, i > _totalPages ? 'disabled' : ''));
-                        link.on('click', {pageIndex: i}, priv.pageChanged);
-                    }
-                    link.appendTo(footPagerUl);
+  
+                  $('<li class="{0}"><a href="#">«</a></li>'.f(_currPage == 1 ? 'disabled' : ''))
+                      .on('click', {pageIndex: _currPage - 1}, priv.pageChanged).appendTo(footPagerUl);
+  
+                  for (var i = lowerPage; i <= upperPage; i++) {
+                      var link;
+                      if (i == _currPage) {
+                          link = $('<li class="active"><a href="#">{0}</a></li>'.f(i));
+                      }
+                      else {
+                          link = $('<li class="{1}"><a href="#">{0}</a></li>'.f(i, i > _totalPages ? 'disabled' : ''));
+                          link.on('click', {pageIndex: i}, priv.pageChanged);
+                      }
+                      link.appendTo(footPagerUl);
+                  }
+                  $('<li class="{0}"><a href="#">»</a></li>'.f(_currPage == _totalPages ? 'disabled' : ''))
+                      .on('click', {pageIndex: _currPage + 1}, priv.pageChanged).appendTo(footPagerUl);
                 }
-                $('<li class="{0}"><a href="#">»</a></li>'.f(_currPage == _totalPages ? 'disabled' : ''))
-                    .on('click', {pageIndex: _currPage + 1}, priv.pageChanged).appendTo(footPagerUl);
-
+ 
                 //create pagesize dropdown
                 if (priv.options.pageSizes.length) {
                     var div = $('<div class="btn-group dropup pagesize"></div>').appendTo(footToolbar);
