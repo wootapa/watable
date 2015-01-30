@@ -726,7 +726,12 @@
                     cell.html(format.f(val));
                     break;
                 case "bool":
-                    $('<input type="checkbox" {0} disabled />'.f(val ? "checked" : "")).appendTo(cell);
+                    var checkbox = cell.children("input:checkbox");
+                    if(checkbox.length) {
+                        checkbox.prop("checked", val);
+                    } else {
+                        $('<input type="checkbox" {0} disabled />'.f(val ? "checked" : "")).appendTo(cell);
+                    }
                     break;
             }
         };
