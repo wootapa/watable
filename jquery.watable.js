@@ -55,14 +55,17 @@
                 date: {}
             },
             transition: undefined, //transition type when paging
-            transitionDuration: 0.3 //duration of transition in seconds
+            transitionDuration: 0.3, //duration of transition in seconds
+            selectOnClick: false, // select current row by clicking on it,
+            selectedRowClass: 'highlightRow', // default selected row class,
+            singlePageMode: false,
         };
 
         /* bundled scripts */
         priv.ext = {};
         priv.ext.XDate = /* xdate 0.7 */ function(a,b,c,d){function e(){var b=this instanceof e?this:new e,c=arguments,d=c.length,h;typeof c[d-1]=="boolean"&&(h=c[--d],c=y(c,0,d));if(d)if(d==1)if(d=c[0],d instanceof a||typeof d=="number")b[0]=new a(+d);else if(d instanceof e){var c=b,i=new a(+d[0]);if(f(d))i.toString=G;c[0]=i}else{if(typeof d=="string"){b[0]=new a(0);a:{for(var c=d,d=h||!1,i=e.parsers,j=0,k;j<i.length;j++)if(k=i[j](c,d,b)){b=k;break a}b[0]=new a(c)}}}else b[0]=new a(F.apply(a,c)),h||(b[0]=u(b[0]));else b[0]=new a;typeof h=="boolean"&&g(b,h);return b}function f(a){return a[0].toString===G}function g(b,c,d){if(c){if(!f(b))d&&(b[0]=new a(F(b[0].getFullYear(),b[0].getMonth(),b[0].getDate(),b[0].getHours(),b[0].getMinutes(),b[0].getSeconds(),b[0].getMilliseconds()))),b[0].toString=G}else f(b)&&(b[0]=d?u(b[0]):new a(+b[0]));return b}function h(a,b,c,d,e){var f=x(s,a[0],e),a=x(t,a[0],e),e=b==1?c%12:f(1),g=!1;d.length==2&&typeof d[1]=="boolean"&&(g=d[1],d=[c]);a(b,d);g&&f(1)!=e&&(a(1,[f(1)-1]),a(2,[v(f(0),f(1))]))}function i(a,c,d,e){var d=Number(d),f=b.floor(d);a["set"+B[c]](a["get"+B[c]]()+f,e||!1);f!=d&&c<6&&i(a,c+1,(d-f)*D[c],e)}function j(a,c,d){var a=a.clone().setUTCMode(!0,!0),c=e(c).setUTCMode(!0,!0),f=0;if(d==0||d==1){for(var g=6;g>=d;g--)f/=D[g],f+=s(c,!1,g)-s(a,!1,g);d==1&&(f+=(c.getFullYear()-a.getFullYear())*12)}else d==2?(d=a.toDate().setUTCHours(0,0,0,0),f=c.toDate().setUTCHours(0,0,0,0),f=b.round((f-d)/864e5)+(c-f-(a-d))/864e5):f=(c-a)/[36e5,6e4,1e3,1][d-3];return f}function k(c){var d=c(0),e=c(1),c=c(2),e=new a(F(d,e,c)),f=l(d),c=f;e<f?c=l(d-1):(d=l(d+1),e>=d&&(c=d));return b.floor(b.round((e-c)/864e5)/7)+1}function l(b){b=new a(F(b,0,4));b.setUTCDate(b.getUTCDate()-(b.getUTCDay()+6)%7);return b}function m(a,b,c,e){var f=x(s,a,e),g=x(t,a,e),c=l(c===d?f(0):c);e||(c=u(c));a.setTime(+c);g(2,[f(2)+(b-1)*7])}function n(a,b,c,d,f){var g=e.locales,h=g[e.defaultLocale]||{},i=x(s,a,f),c=(typeof c=="string"?g[c]:c)||{};return o(a,b,function(a){if(d)for(var b=(a==7?2:a)-1;b>=0;b--)d.push(i(b));return i(a)},function(a){return c[a]||h[a]},f)}function o(a,b,c,e,f){for(var g,h,i="";g=b.match(E);){i+=b.substr(0,g.index);if(g[1]){h=i;for(var i=a,j=g[1],k=c,l=e,m=f,n=j.length,q=void 0,r="";n>0;)q=p(i,j.substr(0,n),k,l,m),q!==d?(r+=q,j=j.substr(n),n=j.length):n--;i=h+(r+j)}else g[3]?(h=o(a,g[4],c,e,f),parseInt(h.replace(/\D/g,""),10)&&(i+=h)):i+=g[7]||"'";b=b.substr(g.index+g[0].length)}return i+b}function p(a,c,d,f,g){var h=e.formatters[c];if(typeof h=="string")return o(a,h,d,f,g);else if(typeof h=="function")return h(a,g||!1,f);switch(c){case"fff":return A(d(6),3);case"s":return d(5);case"ss":return A(d(5));case"m":return d(4);case"mm":return A(d(4));case"h":return d(3)%12||12;case"hh":return A(d(3)%12||12);case"H":return d(3);case"HH":return A(d(3));case"d":return d(2);case"dd":return A(d(2));case"ddd":return f("dayNamesShort")[d(7)]||"";case"dddd":return f("dayNames")[d(7)]||"";case"M":return d(1)+1;case"MM":return A(d(1)+1);case"MMM":return f("monthNamesShort")[d(1)]||"";case"MMMM":return f("monthNames")[d(1)]||"";case"yy":return(d(0)+"").substring(2);case"yyyy":return d(0);case"t":return q(d,f).substr(0,1).toLowerCase();case"tt":return q(d,f).toLowerCase();case"T":return q(d,f).substr(0,1);case"TT":return q(d,f);case"z":case"zz":case"zzz":return g?c="Z":(f=a.getTimezoneOffset(),a=f<0?"+":"-",d=b.floor(b.abs(f)/60),f=b.abs(f)%60,g=d,c=="zz"?g=A(d):c=="zzz"&&(g=A(d)+":"+A(f)),c=a+g),c;case"w":return k(d);case"ww":return A(k(d));case"S":return c=d(2),c>10&&c<20?"th":["st","nd","rd"][c%10-1]||"th"}}function q(a,b){return a(3)<12?b("amDesignator"):b("pmDesignator")}function r(a){return!isNaN(+a[0])}function s(a,b,c){return a["get"+(b?"UTC":"")+B[c]]()}function t(a,b,c,d){a["set"+(b?"UTC":"")+B[c]].apply(a,d)}function u(b){return new a(b.getUTCFullYear(),b.getUTCMonth(),b.getUTCDate(),b.getUTCHours(),b.getUTCMinutes(),b.getUTCSeconds(),b.getUTCMilliseconds())}function v(b,c){return 32-(new a(F(b,c,32))).getUTCDate()}function w(a){return function(){return a.apply(d,[this].concat(y(arguments)))}}function x(a){var b=y(arguments,1);return function(){return a.apply(d,b.concat(y(arguments)))}}function y(a,b,e){return c.prototype.slice.call(a,b||0,e===d?a.length:e)}function z(a,b){for(var c=0;c<a.length;c++)b(a[c],c)}function A(a,b){b=b||2;for(a+="";a.length<b;)a="0"+a;return a}var B="FullYear,Month,Date,Hours,Minutes,Seconds,Milliseconds,Day,Year".split(","),C=["Years","Months","Days"],D=[12,31,24,60,60,1e3,1],E=/(([a-zA-Z])\2*)|(\((('.*?'|\(.*?\)|.)*?)\))|('(.*?)')/,F=a.UTC,G=a.prototype.toUTCString,H=e.prototype;H.length=1;H.splice=c.prototype.splice;H.getUTCMode=w(f);H.setUTCMode=w(g);H.getTimezoneOffset=function(){return f(this)?0:this[0].getTimezoneOffset()};z(B,function(a,b){H["get"+a]=function(){return s(this[0],f(this),b)};b!=8&&(H["getUTC"+a]=function(){return s(this[0],!0,b)});b!=7&&(H["set"+a]=function(a){h(this,b,a,arguments,f(this));return this},b!=8&&(H["setUTC"+a]=function(a){h(this,b,a,arguments,!0);return this},H["add"+(C[b]||a)]=function(a,c){i(this,b,a,c);return this},H["diff"+(C[b]||a)]=function(a){return j(this,a,b)}))});H.getWeek=function(){return k(x(s,this,!1))};H.getUTCWeek=function(){return k(x(s,this,!0))};H.setWeek=function(a,b){m(this,a,b,!1);return this};H.setUTCWeek=function(a,b){m(this,a,b,!0);return this};H.addWeeks=function(a){return this.addDays(Number(a)*7)};H.diffWeeks=function(a){return j(this,a,2)/7};e.parsers=[function(b,c,d){if(b=b.match(/^(\d{4})(-(\d{2})(-(\d{2})([T ](\d{2}):(\d{2})(:(\d{2})(\.(\d+))?)?(Z|(([-+])(\d{2})(:?(\d{2}))?))?)?)?)?$/)){var e=new a(F(b[1],b[3]?b[3]-1:0,b[5]||1,b[7]||0,b[8]||0,b[10]||0,b[12]?Number("0."+b[12])*1e3:0));b[13]?b[14]&&e.setUTCMinutes(e.getUTCMinutes()+(b[15]=="-"?1:-1)*(Number(b[16])*60+(b[18]?Number(b[18]):0))):c||(e=u(e));return d.setTime(+e)}}];e.parse=function(a){return+e(""+a)};H.toString=function(a,b,c){return a===d||!r(this)?this[0].toString():n(this,a,b,c,f(this))};H.toUTCString=H.toGMTString=function(a,b,c){return a===d||!r(this)?this[0].toUTCString():n(this,a,b,c,!0)};H.toISOString=function(){return this.toUTCString("yyyy-MM-dd'T'HH:mm:ss(.fff)zzz")};e.defaultLocale="";e.locales={"":{monthNames:"January,February,March,April,May,June,July,August,September,October,November,December".split(","),monthNamesShort:"Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec".split(","),dayNames:"Sunday,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday".split(","),dayNamesShort:"Sun,Mon,Tue,Wed,Thu,Fri,Sat".split(","),amDesignator:"AM",pmDesignator:"PM"}};e.formatters={i:"yyyy-MM-dd'T'HH:mm:ss(.fff)",u:"yyyy-MM-dd'T'HH:mm:ss(.fff)zzz"};z("getTime,valueOf,toDateString,toTimeString,toLocaleString,toLocaleDateString,toLocaleTimeString,toJSON".split(","),function(a){H[a]=function(){return this[0][a]()}});H.setTime=function(a){this[0].setTime(a);return this};H.valid=w(r);H.clone=function(){return new e(this)};H.clearTime=function(){return this.setHours(0,0,0,0)};H.toDate=function(){return new a(+this[0])};e.now=function(){return+(new a)};e.today=function(){return(new e).clearTime()};e.UTC=F;e.getDaysInMonth=v;if(typeof module!=="undefined"&&module.exports)module.exports=e;return e}(Date,Math,Array);
 
-        //these holds the actual dom table objects, and is used to identify what parts of the table that needs to be created.
+         //these holds the actual dom table objects, and is used to identify what parts of the table that needs to be created.
         var _cont; //container holding table
         var _table; //the table
         var _head; //table header
@@ -175,7 +178,7 @@
 
             //check supports dataBinding
             _dataBind = (priv.options.dataBind && !!document.addEventListener);
-            
+
             if (priv.options.data) {
                 priv.setData(priv.options.data);
             }
@@ -197,7 +200,7 @@
                     priv.setData(data);
                 }
             }
-            
+
             //try call webservice for data
             priv.update();
         };
@@ -235,7 +238,7 @@
                 _headSort = $('<tr class="sort"></tr>').prependTo(_head);
 
                 //create the checkall toggle
-                if (_uniqueCol && priv.options.checkboxes) {
+                if (_uniqueCol && (priv.options.checkboxes || priv.options.selectOnClick)) {
                     var checked = _checkToggleChecked ? 'checked' : '';
                     var headCell = $('<th></th>').appendTo(_headSort);
                     if (priv.options.checkAllToggle) {
@@ -252,9 +255,9 @@
                     if (!props.hidden) {
                         var headCell = $('<th></th>').appendTo(_headSort);
                         var link;
-                        if(priv.options.sorting && props.sorting !== false) {
+                        if (priv.options.sorting && props.sorting !== false) {
                             link = $('<a class="pull-left" href="#">{0}</a>'.f(props.friendly || column));
-                            link.on('click', {column: column}, priv.columnClicked);
+                            link.on('click', { column: column }, priv.columnClicked);
                         }
                         else {
                             link = $('<span class="pull-left">{0}</span>'.f(props.friendly || column));
@@ -293,7 +296,7 @@
                 var tooltip = '';
 
                 //create the filter checkbox
-                if (_uniqueCol && priv.options.checkboxes) {
+                if (_uniqueCol && (priv.options.checkboxes || priv.options.selectOnClick)) {
                     tooltip = priv.options.types.bool.filterTooltip || 'Toggle between:<br/>indeterminate,<br/>checked,<br/>unchecked';
                     headCell = $('<th></th>').appendTo(_headFilter);
                     elem = $('<input class="filter indeterminate" checked type="checkbox" />').appendTo(headCell);
@@ -347,8 +350,8 @@
                                 tooltip = (tooltip === true || tooltip == undefined) ? 'Today:<br/>0..1<br/>All except today:<br/>!0..1<br/>A week today excluded:<br/>-7..0' : tooltip === false ? '' : tooltip;
                                 elem = $('<div><input placeholder="{0}" class="filter" type="text" /></div>'.f(placeHolder));
 
-                                if (priv.options.types.date.datePicker === true || priv.options.types.date.datePicker == undefined)
-                                {
+                                 if (priv.options.types.date.datePicker === true || priv.options.types.date.datePicker == undefined)
+                                 {
                                     if ($().datepicker)
                                     {
                                         elem.addClass('date-wrap');
@@ -446,13 +449,17 @@
                     
                     if (_uniqueCol) {
                         _data.meta.rowsRendered[row[_uniqueCol]] = rowRendered;
-                        
+
                         //create checkbox
                         if (priv.options.checkboxes) {
                             var check = _data.meta.rowsChecked[row[_uniqueCol]] != undefined ? 'checked' : '';
                             var checkable = row['row-checkable'] === false ? 'disabled' : '';
                             var cell = $('<td class="watable-col-cbunique"></td>').appendTo(rowRendered);
                             $('<input class="unique" {0} {1} type="checkbox" />'.f(check, checkable)).appendTo(cell);
+                        }
+
+                        if (priv.options.selectOnClick && _data.meta.rowsChecked[row[_uniqueCol]] != undefined) {
+                            rowRendered.addClass(priv.options.selectedRowClass);
                         }
                     }
 
@@ -568,38 +575,41 @@
 
                 var footToolbar = $('<div class="btn-toolbar"></div>').appendTo(footCell);
                 var footDiv = $('<div class="btn-group"></div>').appendTo(footToolbar);
-                var footPagerUl = $('<ul class="pagination"></ul>').appendTo(footDiv);
 
-                $('<li class="{0}"><a href="#">«</a></li>'.f(_currPage == 1 ? 'disabled' : ''))
-                    .on('click', {pageIndex: _currPage - 1}, priv.pageChanged).appendTo(footPagerUl);
+                if (priv.options.pageSizes.length && priv.options.singlePageMode === false) {
+                    var footPagerUl = $('<ul class="pagination"></ul>').appendTo(footDiv);
 
-                for (var i = lowerPage; i <= upperPage; i++) {
-                    var link;
-                    if (i == _currPage) {
-                        link = $('<li class="active"><a href="#">{0}</a></li>'.f(i));
-                        link.on('click', function(e) { e.preventDefault();} )
+                    $('<li class="{0}"><a href="#">«</a></li>'.f(_currPage == 1 ? 'disabled' : ''))
+                        .on('click', {pageIndex: _currPage - 1}, priv.pageChanged).appendTo(footPagerUl);
+
+                    for (var i = lowerPage; i <= upperPage; i++) {
+                        var link;
+                        if (i == _currPage) {
+                            link = $('<li class="active"><a href="#">{0}</a></li>'.f(i));
+                            link.on('click', function(e) { e.preventDefault();} )
+                        }
+                        else {
+                            link = $('<li class="{1}"><a href="#">{0}</a></li>'.f(i, i > _totalPages ? 'disabled' : ''));
+                            link.on('click', {pageIndex: i}, priv.pageChanged);
+                        }
+                        link.appendTo(footPagerUl);
                     }
-                    else {
-                        link = $('<li class="{1}"><a href="#">{0}</a></li>'.f(i, i > _totalPages ? 'disabled' : ''));
-                        link.on('click', {pageIndex: i}, priv.pageChanged);
+                    $('<li class="{0}"><a href="#">»</a></li>'.f(_currPage == _totalPages ? 'disabled' : ''))
+                        .on('click', {pageIndex: _currPage + 1}, priv.pageChanged).appendTo(footPagerUl);
+
+                    //create pagesize dropdown
+                    if (priv.options.pageSizes.length) {
+                        var div = $('<div class="btn-group dropup pagesize"></div>').appendTo(footToolbar);
+                        var btn = $('<button class="btn btn-default dropdown-toggle" data-toggle="dropdown" href="#">Rows&nbsp;</button>').appendTo(div);
+                        var span = $('<span class="caret"></span>').appendTo(btn);
+                        var ul = $('<ul class="dropdown-menu">').appendTo(div);
+
+                        $.each(priv.options.pageSizes, function (index, val) {
+                            var li = $('<li></li>').appendTo(ul);
+                            $('<a href="#">{0}</a>'.f(val)).appendTo(li);
+                        });
+                        div.on('click', 'a', priv.pageSizeChanged);
                     }
-                    link.appendTo(footPagerUl);
-                }
-                $('<li class="{0}"><a href="#">»</a></li>'.f(_currPage == _totalPages ? 'disabled' : ''))
-                    .on('click', {pageIndex: _currPage + 1}, priv.pageChanged).appendTo(footPagerUl);
-
-                //create pagesize dropdown
-                if (priv.options.pageSizes.length) {
-                    var div = $('<div class="btn-group dropup pagesize"></div>').appendTo(footToolbar);
-                    var btn = $('<button class="btn btn-default dropdown-toggle" data-toggle="dropdown" href="#">Rows&nbsp;</button>').appendTo(div);
-                    var span = $('<span class="caret"></span>').appendTo(btn);
-                    var ul = $('<ul class="dropdown-menu">').appendTo(div);
-
-                    $.each(priv.options.pageSizes, function (index, val) {
-                        var li = $('<li></li>').appendTo(ul);
-                        $('<a href="#">{0}</a>'.f(val)).appendTo(li);
-                    });
-                    div.on('click', 'a', priv.pageSizeChanged);
                 }
 
                 //create columnpicker dropdown
@@ -687,7 +697,7 @@
             $.each(addClasses, function(i, cls) {
                 renderedRow.addClass(cls);
             });
-            var removeClasses = $.unique($(oldClasses)).not($(newClasses.concat(['odd','even']))).get();
+            var removeClasses = $.unique($(oldClasses)).not($(newClasses.concat(['odd', 'even', priv.options.selectedRowClass]))).get();
             $.each(removeClasses, function(i, cls) {
                 renderedRow.removeClass(cls);
             });
@@ -697,7 +707,7 @@
                 if (!cell.hasClass(cellClass))
                     cell.addClass(cellClass);
             }
-            
+
             var val = row[col];
             /*
             if (val === undefined) {
@@ -805,6 +815,10 @@
             _data = data;
             _data.meta.rowsAll = pData.rows;
 
+            if (priv.options.singlePageMode) {
+                priv.options.pageSize = _data.meta.rowsAll.length;
+            }
+
             //wash the new data a bit
             _uniqueCol = "";
             $.each(_data.cols, function (col, props) {
@@ -857,7 +871,7 @@
                     hidden: true
                 };
 
-               _data.meta.rowObservers = {};
+                _data.meta.rowObservers = {};
                 $.each(_data.meta.rowsAll, function (index, row) {
                     //add rows that needs to be pre-checked
                     if (row["row-checked"] === true) {
@@ -871,9 +885,9 @@
                     //add row observer
                     priv.addRowObserver(row);
                 });
-                 if (_dataBind) {
+                if (_dataBind) {
                     _data.meta.rowsObserver = new ArrayObserver(_data.meta.rowsAll).open(priv.rowsChanged);
-                 }
+                }
             }
 
             _head = undefined;
@@ -1077,7 +1091,7 @@
                             var b = _data.meta.rowsChecked[a] ? _data.meta.rowsChecked[a][_uniqueCol] : '';
                             if ((colProps.filter && a === b) || (!colProps.filter && b === '')) return row;
                         });
-                        break;  
+                        break;
                 }
                 if (colProps.filter === '') delete _filterCols[colProps.col.column];
             });
@@ -1150,12 +1164,12 @@
 
             //check vendor support
             var vendorSupport = false;
-             $.each(_vendors, function (index, vendor) {
-                 if ('{0}Transition'.f(vendor) in style) {
-                     vendorSupport = true;
-                     return false;
-                 }
-             });
+            $.each(_vendors, function (index, vendor) {
+                if ('{0}Transition'.f(vendor) in style) {
+                    vendorSupport = true;
+                    return false;
+                }
+            });
             return vendorSupport;
         };
 
@@ -1397,14 +1411,16 @@
                 return;
             }
             var elem = $(this);
-            var unique = elem.closest('tr').data('unique');
+            var tableRow = elem.closest('tr');
+            var unique = tableRow.data('unique');
             if (!unique) return;
 
             //gather callback data
             var column = _data.cols[elem.data('column')];
-            var row =  _data.meta.rowsLookup[unique].row;
+            var row = _data.meta.rowsLookup[unique].row;
             var index = _data.meta.rowsLookup[unique].index;
             var isChecked = _data.meta.rowsChecked[unique] != undefined;
+            var target = $(e.target);
 
             //trigger callback
             if (typeof priv.options.rowClicked == 'function') {
@@ -1419,21 +1435,43 @@
 
                 //check for new checked state
                 if (row['row-checkable'] !== false) {
-                    var target = $(e.target);
                     var checkbox;
 
                     if (target.hasClass('unique') && target.prop('checked') != callBackData.checked) {
                         checkbox = $(target);
                         e.preventDefault();
                     }
+
                     if (callBackData.checked != isChecked) {
-                        checkbox = checkbox || $('.unique', elem.closest('tr'));
+                        checkbox = checkbox || $('.unique', tableRow);
                         checkbox.prop('checked', callBackData.checked);
                         priv.rowChecked.call(checkbox, e);
                     }
                 }
             }
 
+            if (row['row-checkable'] !== false && priv.options.selectOnClick) {
+                if (e.ctrlKey) {
+                    if (_data.meta.rowsChecked[row[_uniqueCol]]) {
+                        delete _data.meta.rowsChecked[row[_uniqueCol]];
+                    } else {
+                        _data.meta.rowsChecked[row[_uniqueCol]] = row;
+                    }
+                } else {
+                    $.each(_data.rows, function (index, currentRow) {
+                        if (currentRow['row-checkable'] === false && _data.meta.rowsChecked[currentRow[_uniqueCol]] === false) return;
+
+                        if (_data.meta.rowsChecked[currentRow[_uniqueCol]] != row) {
+                            delete _data.meta.rowsChecked[currentRow[_uniqueCol]];
+                        }
+                    });
+
+                    _data.meta.rowsChecked[row[_uniqueCol]] = row;
+                }
+
+                _body = undefined;
+                priv.createTable();
+            }
         };
 
         /*
@@ -1533,7 +1571,7 @@
                     //re-render table if sorting/filtering on checked state
                     if (col && _filterCols[col.column] || _data.cols[_currSortCol] == col)
                         createTable = true;
-                    //otherwise, re-render the checkbox
+                        //otherwise, re-render the checkbox
                     else if (rowRendered)
                         $('input.unique', rowRendered.closest('tr')).prop('checked', row["row-checked"] === true);
                     return;
