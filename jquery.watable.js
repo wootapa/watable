@@ -1,5 +1,5 @@
 /*
- WATable 1.10.2
+ WATable 1.10.3
  Copyright (c) 2012 Andreas Petersson(apesv03@gmail.com)
  http://wootapa-watable.appspot.com/
 
@@ -72,11 +72,6 @@
         var _foot; //table footer
 
         var _data = {};  //columns and rows
-        _data.meta = {
-            rowsLookup: {}, //array for fast row lookup
-            rowsChecked: {}, //array with checked rows
-            rowsRendered: {} //array with currently rendered rows
-        };
         var _currPage = 1; //current page
         var _pageSize; //current pagesize
         var _totalPages = 1; //total pages
@@ -88,6 +83,7 @@
         var _uniqueCol; //reference to column with the unique property
         var _checkToggleChecked = false; //check-all toggle state
         var _dataBind; //true if dataBind
+        var _reservedRowProps = ['AutoFormat']; //internally used row properties
 
         var _vendors = ["webkit", "moz", "Moz", "ms", "o", "O"]; //vendors prefixes. used for not yet officially supported features.
         var _transition = {
@@ -299,9 +295,12 @@
                     elem = $('<input class="filter indeterminate" checked type="checkbox" />').appendTo(headCell);
                     $.map(_filterCols, function (colProps, col) {
                         if (col == "unique") {
-                            if (colProps.filter) elem.prop('checked', true).removeClass('indeterminate');
-                            else if (!colProps.filter) elem.prop('checked', false).removeClass('indeterminate');
-                            else if (colProps.filter == '') elem.addClass('indeterminate');
+                            if (colProps.filter == 1)
+                                elem.prop('checked', true).removeClass('indeterminate');
+                            else if (colProps.filter == 0)
+                                elem.prop('checked', false).removeClass('indeterminate');
+                            else
+                                elem.prop('checked', true).addClass('indeterminate');
                         }
                     });
 
@@ -398,15 +397,24 @@
                             });
                         }
 
-                        if (elem && props.filter) {
+                        if (elem && props.filter !== false) {
                             $.map(_filterCols, function (colProps, col) {
                                 if (col == column) {
                                     if (colProps.col.type == 'bool') {
-                                        if (colProps.filter) elem.prop('checked', true).removeClass('indeterminate');
-                                        else if (!colProps.filter) elem.prop('checked', false).removeClass('indeterminate');
-                                        else if (colProps.filter == '') elem.addClass('indeterminate');
+                                        if (colProps.filter == 1)
+                                            elem.prop('checked', true).removeClass('indeterminate');
+                                        else if (colProps.filter == 0)
+                                            elem.prop('checked', false).removeClass('indeterminate');
+                                        else
+                                            elem.prop('checked', true).addClass('indeterminate');
                                     }
-                                    else elem.val(colProps.filter);
+                                    else if (colProps.col.type == 'date') {
+                                        //dates have the input nested
+                                        $('input:first', elem).val(colProps.filter);
+                                    }
+                                    else{
+                                        elem.val(colProps.filter);
+                                    }
                                 }
                             });
                             elem.appendTo(headCell);
@@ -699,16 +707,13 @@
             }
             
             var val = row[col];
-            /*
-            if (val === undefined) {
-                cell.html('');
-                return;
-            }
-            */
+            var format = row[col + 'Format'] ||
+                        _data.cols[col].format ||
+                        row[col + 'AutoFormat'] ||
+                        '{0}';
 
-            var format = row[col + 'Format'] || _data.cols[col].format || '{0}';
             function isNumber(n) {
-              return !isNaN(parseFloat(n)) && isFinite(n);
+                return !isNaN(parseFloat(n)) && isFinite(n);
             }
 
             switch (_data.cols[col].type) {
@@ -743,9 +748,9 @@
                 case "bool":
                     var checkbox = cell.children("input:checkbox");
                     if(checkbox.length) {
-                        checkbox.prop("checked", val);
+                        checkbox.prop("checked", val == 1);
                     } else {
-                        $('<input type="checkbox" {0} disabled />'.f(val ? "checked" : "")).appendTo(cell);
+                        $('<input type="checkbox" {0} disabled />'.f(val == 1 ? "checked" : "")).appendTo(cell);
                     }
                     break;
             }
@@ -794,8 +799,9 @@
         priv.setData = function (pData, skipCols, resetChecked) {
             var data = $.extend(true, {}, pData);
             data.meta = {};
-            data.meta.fromRow = _data && _data.meta.fromRow || 0;
-            data.meta.toRow = _data && _data.meta.toRow || 0;
+            data.meta.rowsRendered = {};
+            data.meta.fromRow = _data.meta && _data.meta.fromRow || 0;
+            data.meta.toRow = _data.meta && _data.meta.toRow || 0;
 
             //use previous column definitions?
             skipCols = skipCols || false;
@@ -829,10 +835,11 @@
 
                 //set any initial filter
                 if (!skipCols) {
-                    if (props.filter == undefined) props.filter = true;
-                    if (props.filter && typeof props.type != "bool" && typeof props.filter != "boolean") {
+                    props.filter = props.filter == undefined ? '' : props.filter;
+
+                    if (props.filter !== false) {
                         _filterCols[col] = _filterCols[col] || {
-                            filter: String(props.filter),
+                            filter: props.filter,
                             col: props
                         };
                     }
@@ -966,12 +973,7 @@
                         _data.rows = $.map(_data.rows, function (row) {
 
                             var val = String(row[col]);
-                            if (!row[col + 'Format'] && !colProps.col.format) {
-                                colProps.col.autoFormat = true;
-                            }
-                            if (colProps.col.autoFormat) {
-                                row[col + 'Format'] = '';
-                            }
+                            row[col + 'AutoFormat'] = '';
 
                             if (regex && validRegex) {
                                 var matches = val.match(filter);
@@ -987,10 +989,7 @@
                                         val = '{0}{1}{2}'.f(pre, matchMask, post);
                                         pos += matchMask.length;
                                     });
-
-                                    if (colProps.col.autoFormat) {
-                                        row[col + 'Format'] = val;
-                                    }
+                                    row[col + 'AutoFormat'] = val;
                                     return row;
                                 }
                             }
@@ -999,12 +998,11 @@
 
                                 if ((pos == -1 && ne) || filter === '') return row;
                                 else if (row[col] != undefined && pos >= 0 && !ne) {
-                                    if (colProps.col.autoFormat) {
-                                        var pre = val.substring(0, pos);
-                                        var match = val.substring(pos, pos + filter.length);
-                                        var post = val.substring(pos + filter.length, row[col].length);
-                                        row[col + 'Format'] = '{0}<span class="filter">{1}</span>{2}'.f(pre, match, post);
-                                    }
+                                    var pre = val.substring(0, pos);
+                                    var match = val.substring(pos, pos + filter.length);
+                                    var post = val.substring(pos + filter.length, row[col].length);
+                                    val = '{0}<span class="filter">{1}</span>{2}'.f(pre, match, post);
+                                    row[col + 'AutoFormat'] = val;
                                     return row;
                                 }
                             }
@@ -1067,7 +1065,7 @@
                     case "bool":
                         _data.rows = $.map(_data.rows, function (row) {
                             if (colProps.filter === '') return row;
-                            if (row[col] != undefined && ((Boolean(row[col]) && colProps.filter) || (!Boolean(row[col]) && !colProps.filter))) return row;
+                            if (row[col] === colProps.filter) return row;
                         });
                         break;
                     case "unique":
@@ -1197,10 +1195,10 @@
                 if (elem.hasClass(cssClass)) {
                     e.preventDefault();
                     elem.removeClass(cssClass);
-                    filter = true;
+                    filter = 1;
                 } else {
                     if (!elem.is(':checked')) {
-                        filter = false;
+                        filter =0;
                     } else {
                         elem.addClass(cssClass);
                         filter = '';
@@ -1385,6 +1383,7 @@
             else {
                 delete _data.meta.rowsChecked[unique];
             }
+            priv.rowClicked.call(elem, e);
         };
 
         /*
@@ -1404,6 +1403,7 @@
             var column = _data.cols[elem.data('column')];
             var row =  _data.meta.rowsLookup[unique].row;
             var index = _data.meta.rowsLookup[unique].index;
+
             var isChecked = _data.meta.rowsChecked[unique] != undefined;
 
             //trigger callback
@@ -1412,7 +1412,7 @@
                     event: e,
                     row: row,
                     index: index,
-                    column: column,
+                    column: column || {}, //no column available when when using the checkboxes
                     checked: isChecked
                 };
                 priv.options.rowClicked.call(e.target, callBackData);
@@ -1429,7 +1429,14 @@
                     if (callBackData.checked != isChecked) {
                         checkbox = checkbox || $('.unique', elem.closest('tr'));
                         checkbox.prop('checked', callBackData.checked);
-                        priv.rowChecked.call(checkbox, e);
+                        //priv.rowChecked.call(checkbox, e);
+                        //store the row in checked array
+                        if (callBackData.checked) {
+                            _data.meta.rowsChecked[unique] = _data.meta.rowsLookup[unique].row;
+                        }
+                        else {
+                            delete _data.meta.rowsChecked[unique];
+                        }
                     }
                 }
             }
@@ -1482,14 +1489,21 @@
         priv.rowsChanged = function(splices) {
 
             $.each(splices, function(index, splice) {
+
+                var start = new priv.ext.XDate();
+                var from = splice.index;
+                var to = splice.index + splice.addedCount;
+
+                //update indexes
+                $.each(_data.meta.rowsAll.slice(to), function(index, row) {
+                    _data.meta.rowsLookup[row[_uniqueCol]].index = to + index;
+                });
                 //remove old references
                 $.each(splice.removed, function(index, row) {
                     delete _data.meta.rowObservers[row[_uniqueCol]];
                     delete _data.meta.rowsLookup[row[_uniqueCol]];
-                });
-
-                var from = splice.index;
-                var to = splice.index + splice.addedCount;
+                    delete _data.meta.rowsChecked[row[_uniqueCol]];
+                });                
 
                 //get the new rows, add them to lookup and make them observable
                 $.each(_data.meta.rowsAll.slice(from, to), function (index, row) {
@@ -1503,6 +1517,8 @@
                         delete _data.meta.rowsChecked[row[_uniqueCol]];
                     priv.addRowObserver(row);
                 });
+
+                priv.log('splicing finished in {0}ms.'.f(new priv.ext.XDate() - start));
             });
 
             _body = undefined;
@@ -1573,16 +1589,27 @@
                 }
             };
 
+            var isReserved = function(property) {
+                var reserved = false;
+                $.each(_reservedRowProps, function(index, prop) {
+                    if (property.indexOf(prop) >= 0) {
+                        reserved = true;
+                        return false;
+                    }
+                });
+                return reserved;
+            };
+
             $.each(Object.keys(changed), function(index, property) {
-                if (createTable) return false;
+                if (isReserved(property) || createTable) return false;
                 render(property);
             });
             $.each(Object.keys(added), function(index, property) {
-                if (createTable) return false;
+                if (isReserved(property) || createTable) return false;
                 render(property);
             });
             $.each(Object.keys(removed), function(index, property) {
-                if (createTable) return false;
+                if (isReserved(property) || createTable) return false;
                 render(property);
             });
 
@@ -1614,6 +1641,10 @@
 
         publ.getRow = function(unique) {
             priv.log('publ.getRow called');
+            if (!_uniqueCol) {
+                priv.log('No unique column defined', true);
+                return;
+            }
             return _data.meta.rowsLookup[unique];
         }
 

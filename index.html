@@ -25,7 +25,7 @@
         $(document).ready( function() {
                 //First example. No options supplied.
                 $('#example1').WATable({
-                    data: generateSampleData(2)
+                    data: generateSampleData(2, true)
                 });
                 
                 //Second example that shows all options.
@@ -81,16 +81,35 @@
                     console.log('table created'); //data.table holds the html table element.
                     console.log(data);            //'this' keyword also holds the html table element.
                 },
-                rowClicked: function(data) {      //Fires when a row is clicked (Note. You need a column with the 'unique' property).
+                rowClicked: function(data) {      //Fires when a row or anything within is clicked (Note. You need a column with the 'unique' property).
                     console.log('row clicked');   //data.event holds the original jQuery event.
-                    console.log(data);            //data.row holds the underlying row you supplied.
+                                                  //data.row holds the underlying row you supplied.
+                                                  //data.index holds the index of row in rows array (Useful when you want to remove the row)
                                                   //data.column holds the underlying column you supplied.
                                                   //data.checked is true if row is checked. (Set to false/true to have it unchecked/checked)
                                                   //'this' keyword holds the clicked element.
-                    if (data.column) {
+
+                    //Removes the row if user clicked on the column called 'remove'.
+                    if (data.column.column == "remove") {
                         data.event.preventDefault();
-                        alert('You clicked column:' + data.column.column + ' with value:' + data.row[data.column.column]);
+                        //Remove fast with dataBind option
+                        waTable.getData().rows.splice(data.index, 1);
+                        Platform.performMicrotaskCheckpoint();
+
+                        //This would have worked fine as well, but is slower
+                        //var d = waTable.getData();
+                        //d.rows.splice(data.index, 1);
+                        //waTable.setData(d);
                     }
+                    //We can look at classes on the clicked element as well
+                    if (this.classList.contains('someClass')) {
+                        //Do something...
+                    }
+                    //Example toggle checked state
+                    if (data.column.column == "check") {
+                        data.checked = !data.checked;
+                    }
+                    console.log(data);
                 },
                 columnClicked: function(data) {    //Fires when a column is clicked
                   console.log('column clicked');  //data.event holds the original jQuery event
@@ -108,7 +127,7 @@
             }).data('WATable');  //This step reaches into the html data property to get the actual WATable object. Important if you want a reference to it as we want here.
 
             //Generate some data
-            var data = generateSampleData(400);
+            var data = generateSampleData(500);
             waTable.setData(data);  //Sets the data.
             //waTable.setData(data, true); //Sets the data but prevents any previously set columns from being overwritten
             //waTable.setData(data, false, false); //Sets the data and prevents any previously checked rows from being reset
@@ -127,6 +146,7 @@
             var row = waTable.getRow(5).row; //Get row with unique value of 5.
             row.name = "Data-Binding Works"; //This would update the table...but only in ultra modern browsers. (See here http://caniuse.com/#search=observe)
             Platform.performMicrotaskCheckpoint(); //This make sure it also works in browsers not yet compatible with Object.observe. This is the polyfill that's used.(https://github.com/polymer/observe-js).
+
             //More databinding
             data.rows.shift(); //Removes the first row.
             var newRow = generateSampleData(1).rows[0];
@@ -149,15 +169,14 @@
                 else if (elem.hasClass('checked')) data = waTable.getData(true);
                 else if (elem.hasClass('filtered')) data = waTable.getData(false, true);
                 else if (elem.hasClass('rendered')) data = waTable.getData(false, false, true);
-                console.log(data.rows.length + ' rows returned');
-                console.log(data);
+                console.log(data.rows.length + ' rows returned', data);
                 alert(data.rows.length + ' rows returned.\nSee data in console.');
             });
 
         });
 
         //Generates some data.
-        function generateSampleData(limit) {
+        function generateSampleData(limit, simpleMode) {
 
             //First define the columns
             var cols = {
@@ -168,8 +187,8 @@
                     format: "<a href='#' target='_blank'>{0}</a>",  //Used to format the data anything you want. Use {0} as placeholder for the actual data.
                     unique: true,  //This is required if you want checkable rows, databinding or to use the rowClicked callback. Be certain the values are really unique or weird things will happen.
                     sortOrder: "asc", //Data will initially be sorted by this column. Possible are "asc" or "desc"
-                    tooltip: "This column has an initial filter" //Show some additional info about column
-                    //filter: "1..400" //Set initial filter.
+                    tooltip: "This column has an initial filter", //Show some additional info about column
+                    filter: "1..400" //Set initial filter.
                 },
                 name: {
                     index: 2,
@@ -201,7 +220,7 @@
                     index: 5,
                     type: "number",
                     friendly: "Height",
-                    hidden:true //Hides the column. Useful if you want this value later on but not visible to user. It can be made visible if columnPicker is enabled.
+                    hidden: true //Hides the column. Useful if you want this value later on but not visible to user. It can be made visible if columnPicker is enabled.
                 },
                 important: {
                     index: 6,
@@ -210,14 +229,32 @@
                 },
                 someDate: {
                     index: 7,
-                    type: "date", //Don't forget dates are expressed in milliseconds
+                    type: "date", //Don't forget dates are expressed in milliseconds.
                     friendly: "SomeDate"
                 },
                 someDateDay: {
                     index: 8,
                     type: "date", //Don't forget dates are expressed in milliseconds
-                    dateFormat: "dddd", //Special date format
+                    dateFormat: "dddd", //Special date format. See all possible formats here http://arshaw.com/xdate/#Formatting.
                     friendly: "Day"
+                },
+                remove: {
+                    index: 9,
+                    type: "string",
+                    friendly: "<span class='glyphicon glyphicon-remove'></span>",
+                    format: "<a href='#' title='Remove me'><span class='glyphicon glyphicon-remove'></span></a>",
+                    filter: false,
+                    sorting: false,
+                    hidden: simpleMode //For the sake of this demo, this column gets hidden for example1
+                },
+                check: {
+                    index: 10,
+                    type: "string",
+                    friendly: "<span class='glyphicon glyphicon-check'></span>",
+                    format: "<a href='#' title='Toggle checked'><span class='glyphicon glyphicon-check'></span></a>",
+                    filter: false,
+                    sorting: false,
+                    hidden: simpleMode //For the sake of this demo, this column gets hidden for example1
                 }
             };
 
@@ -245,7 +282,7 @@
                 row.height           = Math.floor(Math.random() * 50) + 150; //Random height
                 row.important        = i % 5 == 0 ? 1 : 0; //Random important
                 row.someDate         = i % 4 == 0 ? undefined : Date.now() + (i*Math.floor(Math.random()*(60 * 60 * 24 * 100))); //Random date
-                row.someDateDay      = row.someDate; //Use same date as above, but its column has different formatting
+                row.someDateDay      = i % 4 == 0 ? "" : row.someDate; //Use same date as above, but its column has different formatting
                 row["row-checkable"] = i % 4 != 0; //disable checking for every 4th row
                 row["row-checked"]   = i % 3 == 0; //pre check every 3rd row
                 row["row-cls"]       = i % 3 == 0 ? "gray, anotherClass" : ""; //apply some row css classes for every 3rd row
