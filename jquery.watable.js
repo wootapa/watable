@@ -719,6 +719,26 @@
             switch (_data.cols[col].type) {
                 case "string":
                     val = val || '';
+					
+					var cellValue = format.f(val);
+                    if (format.indexOf("row.") >= 0) {
+                        var re = /row\.(\w*)/g;
+                        var m;
+                        while ((m = re.exec(cellValue)) !== null) {
+                            if (m.index === re.lastIndex) {
+                                re.lastIndex++;
+                            }                            
+                            if (m.length % 2 != 0) {
+                                priv.log("Format of formatstring is not correct. Formatstring: {0}".f(cellValue), true);
+                                continue;
+                            }
+                            var dataField = m[1];
+                            if (row[dataField]) {
+                                cellValue = cellValue.replace(new RegExp(m[0], 'gm'), row[dataField]);
+                            }
+                        }
+                    }
+
                     cell.html(format.f(val));
                     break;
                 case "number":
