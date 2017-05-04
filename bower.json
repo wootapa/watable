@@ -1,0 +1,25 @@
+{
+    "name": "WATable",
+    "version": "1.10.3",
+    "homepage": "http://wootapa-watable.appspot.com",
+    "authors": ["Andreas Petersson <apesv03@gmail.com>"],
+    "description": "A swiss army jQuery table plugin. Filter, format, paginate and sort your data with ease and lightning speed.",
+    "main": [
+        "jquery.watable.js",
+        "watable.css"
+    ],
+    "keywords": [
+        "table",
+        "jquery",
+        "paginate",
+        "sort",
+        "filter"
+    ],
+    "ignore": [
+        "index.html"
+    ],
+    "dependencies": {
+        "jquery": ">= 1.7.1",
+        "bootstrap": ">= 3.2.0"
+    }
+}
