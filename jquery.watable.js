@@ -744,7 +744,6 @@
                 case "date":
                     val = val || '';
                     if (val) {
-                        val = (+val);
                         val = new priv.ext.XDate(val, _data.cols[col].dateUTC === true || priv.options.types.date.utc === true).toString(_data.cols[col].dateFormat || priv.options.types.date.format || 'yyyy-MM-dd HH:mm:ss');
                     }
                     cell.html(format.f(val));
