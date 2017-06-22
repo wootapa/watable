@@ -41,6 +41,7 @@
             checkAllToggle: true, //show check all toggle
             actions: '', //holds action links
             pageSize: 10, //current pagesize
+            pageSizePadding: false, //pad with empty rows
             pageSizes: [10, 20, 30, 40, 50, 'All'], //available pagesizes
             hidePagerOnEmpty: false, //removes pager if no rows
             preFill: false, //prefill table with empty rows
@@ -238,17 +239,18 @@
 
 
                     var _hdr_width = typeof props.width !== 'undefined' ? 'width:'+parseInt(props.width)+'px;' : '';
-                    var _hdr_align = typeof props.hdr_align !== 'undefined' && $.inArray(props.hdr_align, _css_aligns) > -1 ? 'text-align:'+props.hdr_align+';width:100%;' : '';
+                    var _hdr_style = typeof props.hdr_style !== 'undefined' ? props.hdr_style : '';
+                    var _hdr_align = typeof props.hdr_align !== 'undefined' && $.inArray(props.hdr_align, _css_aligns) > -1 ? 'text-align:'+props.hdr_align+';width:77%;' : '';
 
                     if (!props.hidden) {
                         var headCell = $('<th style="'+_hdr_width+'"></th>').appendTo(_headSort);
                         var link;
                         if(priv.options.sorting && props.sorting !== false) {
-                            link = $('<a class="pull-left" href="#" style="'+_hdr_align+'">{0}</a>'.f(props.friendly || column));
+                            link = $('<a class="pull-left" href="#" style="'+_hdr_align+_hdr_style+'">{0}</a>'.f(props.friendly || column));
                             link.on('click', {column: column}, priv.columnClicked);
                         }
                         else {
-                            link = $('<span class="pull-left" style="'+_hdr_align+'">{0}</span>'.f(props.friendly || column));
+                            link = $('<span class="pull-left" style="'+_hdr_align+_hdr_style+'">{0}</span>'.f(props.friendly || column));
                         }
                         link.appendTo(headCell);
 
@@ -434,16 +436,20 @@
                     }
 
                     //create cells
+                    var v  = 0;
                     for (var i = 0; i < colsSorted.length; i++) {
                         var key = colsSorted[i];
                         var val = props[key];
                         if (!_data.cols[key]) return;
                         if (_data.cols[key].unique) row.data('unique', val);
 
-							   var _col_align = typeof _data.cols[key].align !== 'undefined' && $.inArray(_data.cols[key].align, _css_aligns) > -1 ? 'text-align:'+_data.cols[key].align+';' : '';
+							   var _col_align		= typeof _data.cols[key].align		!== 'undefined' && $.inArray(_data.cols[key].align, _css_aligns) > -1 ? 'text-align:'+_data.cols[key].align+';' : '';
+								var _col_style		= typeof _data.cols[key].col_style	!== 'undefined' ? _data.cols[key].col_style : '';
+								var _col_class		= typeof _data.cols[key].col_class	!== 'undefined' ? _data.cols[key].col_class : '';
+								var _col_truncate	= typeof _data.cols[key].truncate	!== 'undefined' ? _data.cols[key].truncate  : false;
 
                         if (!_data.cols[key].hidden) {
-                            var cell = $('<td style="'+_col_align+'"></td>').appendTo(row);
+                            var cell = $('<td style="cursor:pointer;'+_col_align+_col_style+'" class="'+_col_class+'"></td>').appendTo(row);
                             cell.data('column', key);
                             if (val === undefined) continue;
 
@@ -451,7 +457,29 @@
 
                             switch (_data.cols[key].type) {
                                 case "string":
-                                    cell.html(format.f(val));
+												if (_col_truncate == true) {
+													var vx = priv.options.checkboxes ? v + 1 : v;
+
+													var _real_width = _head[0].rows[0].cells[vx] === undefined
+																				? _data.cols[key].width.toInt()
+																				: _head[0].rows[0].cells[vx].scrollWidth;
+													if (nzInt(_real_width) < 10) {
+														_real_width = nzInt(_data.cols[key].width);
+													}
+													var _cell_padding = priv.options.tableCondensed ? '4px' : '8px';
+													cell.css({
+														'padding' : 0,
+														'width'   : _real_width+'px'
+													});
+													cell.html(
+														'<div class="truncate" style="padding:'+_cell_padding+';width:'+_real_width+'px;">'+
+															format.f(val)+
+														'</div>'
+													);
+												}
+												else {
+													cell.html(format.f(val));
+												}
                                     break;
                                 case "number":
                                     val = (+val);
@@ -464,13 +492,26 @@
                                     }
                                     break;
                                 case "date":
-                                    val = new priv.ext.XDate(val, priv.options.types.date.utc === true).toString(priv.options.types.date.format || 'yyyy-MM-dd HH:mm:ss');
-                                    cell.html(format.f(val));
+												if (val.substring(0, 4) == '0000') {
+													cell.html(" ");
+												}
+												else {
+													val = new priv.ext.XDate(val, priv.options.types.date.utc === true).toString(priv.options.types.date.format || 'yyyy-MM-dd HH:mm:ss');
+													//val = new priv.ext.XDate(val, priv.options.types.date.dateUTC === true || priv.options.types.date.utc === true).toString(priv.options.types.date.dateFormat || priv.options.types.date.format || 'yyyy-MM-dd HH:mm:ss');
+													cell.html(format.f(val));
+												}
                                     break;
                                 case "bool":
-                                    $('<input type="checkbox" {0} disabled />'.f(val ? "checked" : "")).appendTo(cell);
+												if (typeof(val) === "boolean") {
+													var _val_bool = val;
+												}
+												else if (typeof(val) === "string") {
+													var _val_bool = val == '1';
+												}
+                                    $('<input type="checkbox" {0} onClick="return false;" />'.f(_val_bool ? "checked" : "")).appendTo(cell);
                                     break;
                             }
+                            v++;
                         }
                     }
                     rowsAdded++;
@@ -489,7 +530,8 @@
 
                 //pad with empty rows if we're at last page.
                 if (_currPage == _totalPages) {
-                    while (rowsAdded < _pageSize) {
+                    var loops = priv.options.pageSize - (_data.toRow - _data.fromRow);
+                    while (loops-- >0) {
                         var row = $('<tr></tr>').appendTo(_body);
 
                         if (_uniqueCol && priv.options.checkboxes) {
@@ -500,7 +542,22 @@
                         $.each(_data.cols, function (column, props) {
                             if (!props.hidden) $('<td>&nbsp;</td>').appendTo(row);
                         });
-                        rowsAdded++;
+                    }
+                }
+                //pad with empty rows?
+                else if (priv.options.pageSize != -1 && (_currPage == _totalPages && _currPage > 1) || priv.options.pageSizePadding) {
+                    var loops = priv.options.pageSize - (_data.toRow - _data.fromRow);
+                    while (loops-- >0) {
+                        var row = $('<tr></tr>').appendTo(_body);
+
+                        if (_uniqueCol && priv.options.checkboxes) {
+                            var cell = $('<td></td>').appendTo(row);
+                            $('<input disabled type="checkbox" />').appendTo(cell);
+                        }
+
+                        $.each(_data.cols, function (column, props) {
+                            if (!props.hidden) $('<td>&nbsp;</td>').appendTo(row);
+                        });
                     }
                 }
 
