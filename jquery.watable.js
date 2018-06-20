@@ -1,5 +1,5 @@
 /*
- WATable 1.10
+ WATable 1.50
  Copyright (c) 2012 Andreas Petersson(apesv03@gmail.com)
  http://wootapa-watable.appspot.com/
 
