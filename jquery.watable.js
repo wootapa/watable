@@ -492,6 +492,7 @@
                                     }
                                     break;
                                 case "date":
+			console.log('date:', val, moment(moment(val).format('YYYY-MM-DD'),dateFormat,true).isValid());
 												if (val.substring(0, 4) == '0000') {
 													cell.html(" ");
 												}
