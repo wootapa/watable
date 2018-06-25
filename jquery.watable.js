@@ -495,6 +495,9 @@
 												if (val.substring(0, 4) == '0000') {
 													cell.html(" ");
 												}
+												else if (moment(moment(val).format('YYYY-MM-DD'),dateFormat,true).isValid() == false) {
+													cell.html(" ");
+												}
 												else {
 													val = new priv.ext.XDate(val, priv.options.types.date.utc === true).toString(priv.options.types.date.format || 'yyyy-MM-dd HH:mm:ss');
 													//val = new priv.ext.XDate(val, priv.options.types.date.dateUTC === true || priv.options.types.date.utc === true).toString(priv.options.types.date.dateFormat || priv.options.types.date.format || 'yyyy-MM-dd HH:mm:ss');
