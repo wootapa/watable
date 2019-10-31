@@ -49,10 +49,19 @@
             sortEmptyLast: true, //empty values will be shown last
             dataBind: false, //updates table when detecting row data changes
             types: { //type specific options
-                string: {},
+                string: {
+                    placeHolder: 'Type to Find',
+                    filterTooltip: 'What are you looking for?<br/>Type to Find'
+                },
                 number: {},
                 bool: {},
-                date: {}
+                date: {
+                    utc: false,
+                    format: 'yyyy-MM-dd HH:mm',
+                    datePicker: false,
+                    placeHolder: false,
+                    filterTooltip: false
+                }
             },
             transition: undefined, //transition type when paging
             transitionDuration: 0.3 //duration of transition in seconds
@@ -555,7 +564,7 @@
                 _foot = $('<tfoot></tfoot>').insertAfter(_body);
 
                 var footRow = $('<tr></tr>').appendTo(_foot);
-                var footCell = $('<td colspan="999"></td>').appendTo(footRow);
+                var footCell = $('<td colspan="' + Object.keys(_data.cols).length + '"></td>').appendTo(footRow);
 
                 //create summary
                 if (_data.rows.length > 0)
@@ -1098,7 +1107,7 @@
             var start = new priv.ext.XDate();
             priv.log('sorting on col:{0} order:{1}'.f(_currSortCol, _currSortFlip ? "desc" : "asc"));
 
-            var isString = (_data.cols[_currSortCol].type == "string");
+            var isString = (_data.cols[_currSortCol].type == "string" || _data.cols[_currSortCol].type == "text");
             _data.rows = _data.rows.sort(function (a, b) {
 
                 var valA = a[_currSortCol];
