@@ -58,9 +58,9 @@
                 date: {
                     utc: false,
                     format: 'yyyy-MM-dd HH:mm',
-                    datePicker: false,
-                    placeHolder: false,
-                    filterTooltip: false
+                    datePicker: true,
+                    placeHolder: 'Filter date',
+                    filterTooltip: 'Pick start and end dates using the arrows'
                 }
             },
             transition: undefined, //transition type when paging
@@ -365,7 +365,7 @@
                                         $('<input style="display:none" type="text"  />').appendTo(dp);
                                         $('<span class="add-on glyphicon glyphicon-chevron-right"></span>').on('click', {op: "l"}, priv.dpOpChanged).appendTo(dp);
                                         $('<span class="add-on glyphicon glyphicon-chevron-left"></span>').on('click', {op: "r"}, priv.dpOpChanged).appendTo(dp);
-                                        dp.datepicker({weekStart:1});
+                                        dp.datepicker({weekStart:1, orientation:'bottom auto'});
                                         dp.on('changeDate', {column: column, input: $('input.filter', elem)}, priv.dpClicked);
                                     }
                                     else
@@ -1021,8 +1021,8 @@
                             }
                         });
                         break;
-                    case "number":
                     case "date":
+                    case "number":
                         var expr = colProps.filter.replace(/\s+/gi, ' ');
                         var pos = -1, lval, rval, op;
                         var ne = expr.charAt(0) == '!';
@@ -1052,17 +1052,22 @@
 
                         _data.rows = $.map(_data.rows, function (row) {
                             var match = false;
+                            var cmp = row[col];
 
+                            if (colProps.col.type == 'date') {
+                                cmp = new priv.ext.XDate(cmp, _data.cols[col].dateUTC === true || priv.options.types.date.utc === true);
+                            }
                             switch (op) {
+
                                 case "=":
-                                    if (row[col] == rval) match = true;
+                                    if (cmp == rval) match = true;
                                     break;
                                 case "..":
                                     if (colProps.col.type == "date") {
-                                        if (row[col] >= lval && row[col] < rval) match = true;
+                                        if (cmp >= lval && cmp < rval) match = true;
                                     }
                                     else {
-                                        if (row[col] >= lval && row[col] <= rval) match = true;
+                                        if (cmp >= lval && cmp <= rval) match = true;
                                     }
                                     break;
                                 default:
@@ -1108,6 +1113,7 @@
             priv.log('sorting on col:{0} order:{1}'.f(_currSortCol, _currSortFlip ? "desc" : "asc"));
 
             var isString = (_data.cols[_currSortCol].type == "string" || _data.cols[_currSortCol].type == "text");
+            var isDate = _data.cols[_currSortCol].type == "date";
             _data.rows = _data.rows.sort(function (a, b) {
 
                 var valA = a[_currSortCol];
@@ -1124,6 +1130,11 @@
                     }
                     if (String(valA).toLowerCase() == String(valB).toLowerCase()) return 0;
                     if (String(valA).toLowerCase() > String(valB).toLowerCase()) return _currSortFlip ? -1 : 1;
+                    else return _currSortFlip ? 1 : -1;
+                } else if (isDate) {
+                    valA = new priv.ext.XDate(valA, _data.cols[_currSortCol].dateUTC === true || priv.options.types.date.utc === true);
+                    valB = new priv.ext.XDate(valB, _data.cols[_currSortCol].dateUTC === true || priv.options.types.date.utc === true);
+                    if (valA > valB) return _currSortFlip ? -1 : 1;
                     else return _currSortFlip ? 1 : -1;
                 } else {
                     if (valA == '' || undefined || isNaN(valA)) {
