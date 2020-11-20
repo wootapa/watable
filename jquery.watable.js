@@ -31,6 +31,7 @@
 
         priv.options = {};
         var defaults = {
+			   parent: '',
             url: '',  //webservice url
             urlData: '', //webservice params
             urlPost: false, //use POST instead of GET
@@ -492,16 +493,14 @@
                                     }
                                     break;
                                 case "date":
-			console.log('date:', val, moment(moment(val).format('YYYY-MM-DD'),dateFormat,true).isValid());
 												if (val.substring(0, 4) == '0000') {
 													cell.html(" ");
 												}
-												else if (moment(moment(val).format('YYYY-MM-DD'),dateFormat,true).isValid() == false) {
+												else if (val == 'Invalid date') {
 													cell.html(" ");
 												}
 												else {
 													val = new priv.ext.XDate(val, priv.options.types.date.utc === true).toString(priv.options.types.date.format || 'yyyy-MM-dd HH:mm:ss');
-													//val = new priv.ext.XDate(val, priv.options.types.date.dateUTC === true || priv.options.types.date.utc === true).toString(priv.options.types.date.dateFormat || priv.options.types.date.format || 'yyyy-MM-dd HH:mm:ss');
 													cell.html(format.f(val));
 												}
                                     break;
@@ -1196,7 +1195,10 @@
          what: triggers table to be created with new pagesize
          */
         priv.pageSizeChanged = function (e) {
-            e.preventDefault();
+			   if (typeof(e) != 'undefined') {
+					e.preventDefault();
+				}
+
             var val = $(this).text().toLowerCase();
             priv.log('pagesize changed to:{0}'.f(val));
 
@@ -1211,7 +1213,7 @@
             if (_data.toRow > _data.rows.length) _data.toRow = _data.rows.length;
 
             //trigger callback
-            if (typeof priv.options.pageSizeChanged == 'function') {
+            if (typeof(e) != 'undefined' && typeof priv.options.pageSizeChanged == 'function') {
                 priv.options.pageSizeChanged.call(e.target, {
                     event: e,
                     pageSize: priv.options.pageSize
@@ -1452,6 +1454,51 @@
             priv.createTable();
             return publ;
         };
+
+        publ.getParent = function() {
+            return priv.options.parent;
+		  }
+
+        publ.resizeGrid = function() {
+				let debug = false;
+
+				let _parent_elem_id = priv.options.parent;
+
+				_parent_elem_id = typeof(_parent_elem_id) == 'undefined' || _parent_elem_id == null ? '' : _parent_elem_id.trim();
+				if (_parent_elem_id.length > 0) {
+					_parent_elem_id = _parent_elem_id.indexOf('#') == 0 || _parent_elem_id.indexOf('.') == 0 ? _parent_elem_id : '#'+_parent_elem_id;
+				}
+
+				let _table_elem_id = _parent_elem_id.length == 0 ? '.watable.table' : _parent_elem_id+' .watable.table';
+
+				var _client_width  = $(_parent_elem_id).width();
+
+				if (debug) {
+					console.log('--- publ.resizeGrid() ------');
+					console.log('parent_elem_id:', _parent_elem_id);
+					console.log('client_width:', _client_width);
+				}
+
+				$('#report-list-wrap .watable.table').css('width', _client_width);
+
+				var _window_height = document.documentElement.clientHeight - (2 * 48);	// 48 - header/footer height
+				priv.options.pageSize = Math.ceil((_window_height - (parseInt(nz(_top_offset, 0)) + 38 + 76)) / 37);	// top offset; 38-table header;76-table footer;37-table row
+
+				if (debug) console.log('priv.options.pageSize:', priv.options.pageSize);
+
+            //revert to first page, as its gets messy otherwise.
+            _currPage = 1;
+            _data.fromRow = 0;
+            _data.toRow = _data.fromRow + priv.options.pageSize;
+            if (_data.toRow > _data.rows.length) _data.toRow = _data.rows.length;
+
+            _body = undefined;
+            _foot = undefined;
+
+            priv.createTable();
+
+				if (debug) console.log('--- /publ.resizeGrid() -----');
+		  }
 
         return publ;
     };
