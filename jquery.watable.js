@@ -762,7 +762,7 @@
                     if(checkbox.length) {
                         checkbox.prop("checked", val == 1);
                     } else {
-                        $('<input type="checkbox" {0} disabled />'.f(val == 1 ? "checked" : "")).appendTo(cell);
+                        $(format.f(val == 1 ? "checked" : "")).appendTo(cell);
                     }
                     break;
             }
@@ -1081,9 +1081,16 @@
                         });
                         break;
                     case "bool":
+                        var val = '<input type="checkbox" {0} disabled />';
                         _data.rows = $.map(_data.rows, function (row) {
-                            if (colProps.filter === '') return row;
-                            if (row[col] === colProps.filter) return row;
+                            if (colProps.filter === '') {
+                                row[col + 'AutoFormat'] = val;
+                                return row;
+                            }
+                            if (row[col] === colProps.filter) {
+                                row[col + 'AutoFormat'] = val;
+                                return row;
+                            }
                         });
                         break;
                     case "unique":
