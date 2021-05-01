@@ -49,10 +49,19 @@
             sortEmptyLast: true, //empty values will be shown last
             dataBind: false, //updates table when detecting row data changes
             types: { //type specific options
-                string: {},
+                string: {
+                    placeHolder: 'Type to Find',
+                    filterTooltip: 'What are you looking for?<br/>Type to Find'
+                },
                 number: {},
                 bool: {},
-                date: {}
+                date: {
+                    utc: false,
+                    format: 'yyyy-MM-dd HH:mm',
+                    datePicker: true,
+                    placeHolder: 'Filter date',
+                    filterTooltip: 'Pick start and end dates using the arrows'
+                }
             },
             transition: undefined, //transition type when paging
             transitionDuration: 0.3 //duration of transition in seconds
@@ -356,7 +365,7 @@
                                         $('<input style="display:none" type="text"  />').appendTo(dp);
                                         $('<span class="add-on glyphicon glyphicon-chevron-right"></span>').on('click', {op: "l"}, priv.dpOpChanged).appendTo(dp);
                                         $('<span class="add-on glyphicon glyphicon-chevron-left"></span>').on('click', {op: "r"}, priv.dpOpChanged).appendTo(dp);
-                                        dp.datepicker({weekStart:1});
+                                        dp.datepicker({weekStart:1, orientation:'bottom auto'});
                                         dp.on('changeDate', {column: column, input: $('input.filter', elem)}, priv.dpClicked);
                                     }
                                     else
@@ -371,6 +380,7 @@
                                 elem.on('click', {column: column}, priv.filterChanged);
                                 break;
                             case "string":
+                            case "text":
                                 if (placeHolder == undefined) placeHolder = priv.options.types.string.placeHolder;
                                 placeHolder = (placeHolder === true || placeHolder == undefined) ? 'John Doe' : placeHolder === false ? '' : placeHolder;
                                 if (tooltip == undefined) tooltip = priv.options.types.string.filterTooltip;
@@ -554,7 +564,7 @@
                 _foot = $('<tfoot></tfoot>').insertAfter(_body);
 
                 var footRow = $('<tr></tr>').appendTo(_foot);
-                var footCell = $('<td colspan="999"></td>').appendTo(footRow);
+                var footCell = $('<td colspan="' + Object.keys(_data.cols).length + '"></td>').appendTo(footRow);
 
                 //create summary
                 if (_data.rows.length > 0)
@@ -717,6 +727,9 @@
             }
 
             switch (_data.cols[col].type) {
+                case "text":
+                    cell.text(val);
+                    break;
                 case "string":
                     val = val || '';
                     cell.html(format.f(val));
@@ -739,8 +752,7 @@
                     break;
                 case "date":
                     val = val || '';
-                    if (isNumber(val)) {
-                        val = (+val);
+                    if (val) {
                         val = new priv.ext.XDate(val, _data.cols[col].dateUTC === true || priv.options.types.date.utc === true).toString(_data.cols[col].dateFormat || priv.options.types.date.format || 'yyyy-MM-dd HH:mm:ss');
                     }
                     cell.html(format.f(val));
@@ -750,7 +762,7 @@
                     if(checkbox.length) {
                         checkbox.prop("checked", val == 1);
                     } else {
-                        $('<input type="checkbox" {0} disabled />'.f(val == 1 ? "checked" : "")).appendTo(cell);
+                        $(format.f(val == 1 ? "checked" : "")).appendTo(cell);
                     }
                     break;
             }
@@ -947,6 +959,7 @@
                 priv.log('filtering on text:{0} col:{1} type:{2} '.f(colProps.filter, colProps.col.column, colProps.col.type));
 
                 switch (colProps.col.type) {
+                    case "text":
                     case "string":
                         var filter = colProps.filter;
                         var ne = false, regex = false, validRegex = true;
@@ -1008,8 +1021,8 @@
                             }
                         });
                         break;
-                    case "number":
                     case "date":
+                    case "number":
                         var expr = colProps.filter.replace(/\s+/gi, ' ');
                         var pos = -1, lval, rval, op;
                         var ne = expr.charAt(0) == '!';
@@ -1039,17 +1052,22 @@
 
                         _data.rows = $.map(_data.rows, function (row) {
                             var match = false;
+                            var cmp = row[col];
 
+                            if (colProps.col.type == 'date') {
+                                cmp = new priv.ext.XDate(cmp, _data.cols[col].dateUTC === true || priv.options.types.date.utc === true);
+                            }
                             switch (op) {
+
                                 case "=":
-                                    if (row[col] == rval) match = true;
+                                    if (cmp == rval) match = true;
                                     break;
                                 case "..":
                                     if (colProps.col.type == "date") {
-                                        if (row[col] >= lval && row[col] < rval) match = true;
+                                        if (cmp >= lval && cmp < rval) match = true;
                                     }
                                     else {
-                                        if (row[col] >= lval && row[col] <= rval) match = true;
+                                        if (cmp >= lval && cmp <= rval) match = true;
                                     }
                                     break;
                                 default:
@@ -1063,9 +1081,16 @@
                         });
                         break;
                     case "bool":
+                        var val = '<input type="checkbox" {0} disabled />';
                         _data.rows = $.map(_data.rows, function (row) {
-                            if (colProps.filter === '') return row;
-                            if (row[col] === colProps.filter) return row;
+                            if (colProps.filter === '') {
+                                row[col + 'AutoFormat'] = val;
+                                return row;
+                            }
+                            if (row[col] === colProps.filter) {
+                                row[col + 'AutoFormat'] = val;
+                                return row;
+                            }
                         });
                         break;
                     case "unique":
@@ -1094,7 +1119,8 @@
             var start = new priv.ext.XDate();
             priv.log('sorting on col:{0} order:{1}'.f(_currSortCol, _currSortFlip ? "desc" : "asc"));
 
-            var isString = (_data.cols[_currSortCol].type == "string");
+            var isString = (_data.cols[_currSortCol].type == "string" || _data.cols[_currSortCol].type == "text");
+            var isDate = _data.cols[_currSortCol].type == "date";
             _data.rows = _data.rows.sort(function (a, b) {
 
                 var valA = a[_currSortCol];
@@ -1111,6 +1137,11 @@
                     }
                     if (String(valA).toLowerCase() == String(valB).toLowerCase()) return 0;
                     if (String(valA).toLowerCase() > String(valB).toLowerCase()) return _currSortFlip ? -1 : 1;
+                    else return _currSortFlip ? 1 : -1;
+                } else if (isDate) {
+                    valA = new priv.ext.XDate(valA, _data.cols[_currSortCol].dateUTC === true || priv.options.types.date.utc === true);
+                    valB = new priv.ext.XDate(valB, _data.cols[_currSortCol].dateUTC === true || priv.options.types.date.utc === true);
+                    if (valA > valB) return _currSortFlip ? -1 : 1;
                     else return _currSortFlip ? 1 : -1;
                 } else {
                     if (valA == '' || undefined || isNaN(valA)) {
